@@ -65,7 +65,7 @@ const CatalogCategories = () => {
               <div
                 key={machine.id}
                 className="cursor-pointer"
-                onClick={() => navigate(`/catalogo/${machine.category}`)}
+                onClick={() => navigate(`/catalogo/${machine.category}?highlight=${machine.id}`)}
               >
                 <MachineItem machine={machine} />
               </div>

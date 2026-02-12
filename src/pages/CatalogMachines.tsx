@@ -1,5 +1,5 @@
-import { useParams, useNavigate } from "react-router-dom";
-import { useState, useMemo } from "react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { categories, machines } from "@/data/machines";
 import MachineItem from "@/components/MachineItem";
 import { ArrowLeft, Search, Plus, Filter } from "lucide-react";
@@ -8,7 +8,10 @@ import { Input } from "@/components/ui/input";
 const CatalogMachines = () => {
   const { categoryId } = useParams<{ categoryId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const highlightId = searchParams.get("highlight");
   const [search, setSearch] = useState("");
+  const highlightRef = useRef<HTMLDivElement>(null);
 
   const category = categories.find((c) => c.id === categoryId);
 
@@ -23,6 +26,14 @@ const CatalogMachines = () => {
         m.subcategory.toLowerCase().includes(q)
     );
   }, [categoryId, search]);
+
+  useEffect(() => {
+    if (highlightId && highlightRef.current) {
+      setTimeout(() => {
+        highlightRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 300);
+    }
+  }, [highlightId]);
 
   if (!category) {
     return (
@@ -72,7 +83,17 @@ const CatalogMachines = () => {
 
         <div className="space-y-3">
           {filtered.map((machine) => (
-            <MachineItem key={machine.id} machine={machine} />
+            <div
+              key={machine.id}
+              ref={machine.id === highlightId ? highlightRef : undefined}
+              className={`rounded-lg transition-all duration-700 ${
+                machine.id === highlightId
+                  ? "ring-2 ring-primary shadow-lg shadow-primary/20"
+                  : ""
+              }`}
+            >
+              <MachineItem machine={machine} />
+            </div>
           ))}
           {filtered.length === 0 && (
             <div className="rounded-lg border border-border bg-card p-12 text-center">
