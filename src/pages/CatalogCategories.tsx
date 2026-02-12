@@ -1,9 +1,29 @@
-import { categories } from "@/data/machines";
+import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { categories, machines } from "@/data/machines";
 import CategoryCard from "@/components/CategoryCard";
-import { Settings, FolderOpen } from "lucide-react";
+import MachineItem from "@/components/MachineItem";
+import { Settings, FolderOpen, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 const CatalogCategories = () => {
+  const navigate = useNavigate();
+  const [search, setSearch] = useState("");
   const totalMachines = categories.reduce((sum, c) => sum + c.machineCount, 0);
+
+  const searchResults = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    return machines.filter(
+      (m) =>
+        m.name.toLowerCase().includes(q) ||
+        m.model.toLowerCase().includes(q) ||
+        m.subcategory.toLowerCase().includes(q) ||
+        m.tags.some((t) => t.toLowerCase().includes(q))
+    );
+  }, [search]);
+
+  const isSearching = search.trim().length > 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -26,11 +46,44 @@ const CatalogCategories = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {categories.map((category, i) => (
-            <CategoryCard key={category.id} category={category} index={i} />
-          ))}
+        <div className="mb-6 relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar máquinas em todas as categorias..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 bg-card border-border"
+          />
         </div>
+
+        {isSearching ? (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground mb-4">
+              {searchResults.length} resultado{searchResults.length !== 1 ? "s" : ""} encontrado{searchResults.length !== 1 ? "s" : ""}
+            </p>
+            {searchResults.map((machine) => (
+              <div
+                key={machine.id}
+                className="cursor-pointer"
+                onClick={() => navigate(`/catalogo/${machine.category}`)}
+              >
+                <MachineItem machine={machine} />
+              </div>
+            ))}
+            {searchResults.length === 0 && (
+              <div className="rounded-lg border border-border bg-card p-12 text-center">
+                <Search className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
+                <p className="text-muted-foreground">Nenhuma máquina encontrada.</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {categories.map((category, i) => (
+              <CategoryCard key={category.id} category={category} index={i} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
