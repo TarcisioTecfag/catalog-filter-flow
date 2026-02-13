@@ -7,6 +7,25 @@ import imgEnvasadoras from "@/assets/category-envasadoras.jpg";
 import imgFechadoras from "@/assets/category-fechadoras.jpg";
 import imgRosqueadoras from "@/assets/category-rosqueadoras.jpg";
 import imgEsteiras from "@/assets/category-esteiras.jpg";
+import imgAbastecedorAutomatico from "@/assets/category-abastecedor-automatico.jpg";
+import imgAlimentadoresParafuso from "@/assets/category-alimentadores-parafuso.jpg";
+import imgAplicadorStretch from "@/assets/category-aplicador-stretch.jpg";
+import imgArqueadoras from "@/assets/category-arqueadoras.jpg";
+import imgDatadoras from "@/assets/category-datadoras.jpg";
+import imgDispensadoresFita from "@/assets/category-dispensadores-fita.jpg";
+import imgDosadoras from "@/assets/category-dosadoras.jpg";
+import imgEmpacotadoras from "@/assets/category-empacotadoras.jpg";
+import imgEncapsuladoras from "@/assets/category-encapsuladoras.jpg";
+import imgEncartuchadeira from "@/assets/category-encartuchadeira.jpg";
+import imgSeladorasCaixa from "@/assets/category-seladoras-caixa.jpg";
+import imgMixersRotativos from "@/assets/category-mixers-rotativos.jpg";
+import imgMoinhosTrituradores from "@/assets/category-moinhos-trituradores.jpg";
+import imgMontadoras from "@/assets/category-montadoras.jpg";
+import imgPrensasRotativas from "@/assets/category-prensas-rotativas.jpg";
+import imgRotuladoras from "@/assets/category-rotuladoras.jpg";
+import imgTanquesEncolhimento from "@/assets/category-tanques-encolhimento.jpg";
+import imgTermoformadoras from "@/assets/category-termoformadoras.jpg";
+import imgTuneisEncolhimento from "@/assets/category-tuneis-encolhimento.jpg";
 
 const imageMap: Record<string, string> = {
   seladoras: imgSeladoras,
@@ -14,6 +33,25 @@ const imageMap: Record<string, string> = {
   fechadoras: imgFechadoras,
   rosqueadoras: imgRosqueadoras,
   esteiras: imgEsteiras,
+  "abastecedor-automatico": imgAbastecedorAutomatico,
+  "alimentadores-parafuso": imgAlimentadoresParafuso,
+  "aplicador-stretch": imgAplicadorStretch,
+  arqueadoras: imgArqueadoras,
+  datadoras: imgDatadoras,
+  "dispensadores-fita": imgDispensadoresFita,
+  dosadoras: imgDosadoras,
+  empacotadoras: imgEmpacotadoras,
+  encapsuladoras: imgEncapsuladoras,
+  encartuchadeira: imgEncartuchadeira,
+  "seladoras-caixa": imgSeladorasCaixa,
+  "mixers-rotativos": imgMixersRotativos,
+  "moinhos-trituradores": imgMoinhosTrituradores,
+  montadoras: imgMontadoras,
+  "prensas-rotativas": imgPrensasRotativas,
+  rotuladoras: imgRotuladoras,
+  "tanques-encolhimento": imgTanquesEncolhimento,
+  termoformadoras: imgTermoformadoras,
+  "tuneis-encolhimento": imgTuneisEncolhimento,
 };
 
 interface CategoryCardProps {

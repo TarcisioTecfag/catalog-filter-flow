@@ -16,11 +16,30 @@ export interface Machine {
 }
 
 export const categories: Category[] = [
+  { id: "esteiras", name: "Esteira Transportadora", description: "Esteiras transportadoras e sistemas de transporte", machineCount: 149, image: "esteiras" },
   { id: "seladoras", name: "Seladoras", description: "Seladoras de caixas, bandejas e embalagens", machineCount: 84, image: "seladoras" },
+  { id: "abastecedor-automatico", name: "Abastecedor Automático", description: "Abastecedores automáticos para linhas de produção", machineCount: 12, image: "abastecedor-automatico" },
+  { id: "alimentadores-parafuso", name: "Alimentadores de Parafuso", description: "Alimentadores de parafuso para dosagem e transporte", machineCount: 8, image: "alimentadores-parafuso" },
+  { id: "aplicador-stretch", name: "Aplicador de Stretch", description: "Aplicadores de filme stretch para paletização", machineCount: 15, image: "aplicador-stretch" },
+  { id: "arqueadoras", name: "Arqueadoras", description: "Arqueadoras automáticas e semi-automáticas", machineCount: 22, image: "arqueadoras" },
+  { id: "datadoras", name: "Datadoras", description: "Datadoras e codificadoras de embalagens", machineCount: 31, image: "datadoras" },
+  { id: "dispensadores-fita", name: "Dispensadores de Fita", description: "Dispensadores de fita adesiva para embalagens", machineCount: 18, image: "dispensadores-fita" },
+  { id: "dosadoras", name: "Dosadoras", description: "Dosadoras de líquidos, pós e granulados", machineCount: 27, image: "dosadoras" },
+  { id: "empacotadoras", name: "Empacotadoras", description: "Empacotadoras automáticas e semi-automáticas", machineCount: 35, image: "empacotadoras" },
+  { id: "encapsuladoras", name: "Encapsuladoras", description: "Encapsuladoras para cápsulas e comprimidos", machineCount: 14, image: "encapsuladoras" },
+  { id: "encartuchadeira", name: "Encartuchadeira Rotativa", description: "Encartuchadeiras rotativas para embalagens", machineCount: 9, image: "encartuchadeira" },
   { id: "envasadoras", name: "Envasadoras", description: "Envasadoras de líquidos, pastosos e granulados", machineCount: 62, image: "envasadoras" },
-  { id: "fechadoras", name: "Fechadoras", description: "Fechadoras de tampas, lacres e capsulas", machineCount: 47, image: "fechadoras" },
+  { id: "fechadoras", name: "Fechadoras", description: "Fechadoras de tampas, lacres e cápsulas", machineCount: 47, image: "fechadoras" },
+  { id: "seladoras-caixa", name: "Seladoras de Caixa", description: "Seladoras específicas para caixas de papelão", machineCount: 29, image: "seladoras-caixa" },
+  { id: "mixers-rotativos", name: "Mixers Rotativos", description: "Mixers rotativos para mistura industrial", machineCount: 11, image: "mixers-rotativos" },
+  { id: "moinhos-trituradores", name: "Moinhos Trituradores", description: "Moinhos e trituradores industriais", machineCount: 16, image: "moinhos-trituradores" },
+  { id: "montadoras", name: "Montadoras", description: "Montadoras de caixas e embalagens", machineCount: 20, image: "montadoras" },
+  { id: "prensas-rotativas", name: "Prensas Rotativas", description: "Prensas rotativas para compactação e moldagem", machineCount: 13, image: "prensas-rotativas" },
   { id: "rosqueadoras", name: "Rosqueadoras", description: "Rosqueadoras automáticas e semi-automáticas", machineCount: 38, image: "rosqueadoras" },
-  { id: "esteiras", name: "Esteiras", description: "Esteiras transportadoras e sistemas de transporte", machineCount: 149, image: "esteiras" },
+  { id: "rotuladoras", name: "Rotuladoras", description: "Rotuladoras automáticas para garrafas e frascos", machineCount: 24, image: "rotuladoras" },
+  { id: "tanques-encolhimento", name: "Tanques de Encolhimento", description: "Tanques de encolhimento térmico para embalagens", machineCount: 10, image: "tanques-encolhimento" },
+  { id: "termoformadoras", name: "Termoformadoras", description: "Termoformadoras para embalagens plásticas", machineCount: 19, image: "termoformadoras" },
+  { id: "tuneis-encolhimento", name: "Túneis de Encolhimento", description: "Túneis de encolhimento térmico para embalagens", machineCount: 17, image: "tuneis-encolhimento" },
 ];
 
 export const machines: Machine[] = [
