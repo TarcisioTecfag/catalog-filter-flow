@@ -5,6 +5,7 @@ import CategoryCard from "@/components/CategoryCard";
 import MachineItem from "@/components/MachineItem";
 import { Settings, FolderOpen, Search, ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import PageTransition from "@/components/PageTransition";
 
 const CatalogCategories = () => {
   const navigate = useNavigate();
