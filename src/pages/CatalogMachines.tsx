@@ -4,6 +4,7 @@ import { categories, machines } from "@/data/machines";
 import MachineItem from "@/components/MachineItem";
 import { ArrowLeft, Search, Plus, Filter } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import PageTransition from "@/components/PageTransition";
 
 const CatalogMachines = () => {
   const { categoryId } = useParams<{ categoryId: string }>();
