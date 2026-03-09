@@ -275,6 +275,7 @@ const LineDetail = () => {
         </div>
       </div>
     </div>
+    </PageTransition>
   );
 };
 

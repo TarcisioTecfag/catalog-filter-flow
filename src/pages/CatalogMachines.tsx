@@ -106,6 +106,7 @@ const CatalogMachines = () => {
         </div>
       </div>
     </div>
+    </PageTransition>
   );
 };
 

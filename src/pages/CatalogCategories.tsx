@@ -94,6 +94,7 @@ const CatalogCategories = () => {
         )}
       </div>
     </div>
+    </PageTransition>
   );
 };
 

@@ -81,6 +81,7 @@ const Index = () => {
         </div>
       </div>
     </div>
+    </PageTransition>
   );
 };
 

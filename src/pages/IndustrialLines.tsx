@@ -72,6 +72,7 @@ const IndustrialLines = () => {
         </div>
       </div>
     </div>
+    </PageTransition>
   );
 };
 
