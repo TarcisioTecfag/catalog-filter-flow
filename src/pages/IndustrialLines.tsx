@@ -2,11 +2,13 @@ import { useNavigate } from "react-router-dom";
 import { industrialLines } from "@/data/industrialLines";
 import { Layers3, ArrowLeft, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
+import PageTransition from "@/components/PageTransition";
 
 const IndustrialLines = () => {
   const navigate = useNavigate();
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-6xl px-4 py-12">
         <div className="mb-10">
