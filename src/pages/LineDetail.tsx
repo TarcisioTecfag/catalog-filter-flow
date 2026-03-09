@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { industrialLines } from "@/data/industrialLines";
 import { ArrowLeft, ChevronRight, Layers3, Cog } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import PageTransition from "@/components/PageTransition";
 import NotFound from "./NotFound";
 
 const LineDetail = () => {
