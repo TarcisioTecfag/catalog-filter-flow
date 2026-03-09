@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { categories, machines } from "@/data/machines";
 import CategoryCard from "@/components/CategoryCard";
 import MachineItem from "@/components/MachineItem";
-import { Settings, FolderOpen, Search } from "lucide-react";
+import { Settings, FolderOpen, Search, ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 const CatalogCategories = () => {
@@ -28,6 +28,13 @@ const CatalogCategories = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-6xl px-4 py-12">
+        <button
+          onClick={() => navigate("/")}
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors mb-6"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Voltar ao menu
+        </button>
         <div className="mb-10 flex items-start justify-between">
           <div>
             <div className="flex items-center gap-3 mb-2">
