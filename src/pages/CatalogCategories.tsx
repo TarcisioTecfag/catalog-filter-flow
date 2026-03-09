@@ -26,6 +26,7 @@ const CatalogCategories = () => {
   const isSearching = search.trim().length > 0;
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-6xl px-4 py-12">
         <button
