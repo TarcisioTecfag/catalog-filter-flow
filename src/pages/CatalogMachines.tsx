@@ -4,6 +4,7 @@ import { categories, machines } from "@/data/machines";
 import MachineItem from "@/components/MachineItem";
 import { ArrowLeft, Search, Plus, Filter } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import PageTransition from "@/components/PageTransition";
 
 const CatalogMachines = () => {
   const { categoryId } = useParams<{ categoryId: string }>();
@@ -44,6 +45,7 @@ const CatalogMachines = () => {
   }
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-4xl px-4 py-12">
         <button
@@ -104,6 +106,7 @@ const CatalogMachines = () => {
         </div>
       </div>
     </div>
+    </PageTransition>
   );
 };
 

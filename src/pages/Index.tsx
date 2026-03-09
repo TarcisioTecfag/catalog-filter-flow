@@ -1,11 +1,13 @@
 import { useNavigate } from "react-router-dom";
 import { Settings2, Layers3, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
+import PageTransition from "@/components/PageTransition";
 
 const Index = () => {
   const navigate = useNavigate();
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="mx-auto max-w-5xl w-full py-16">
         <motion.div
@@ -79,6 +81,7 @@ const Index = () => {
         </div>
       </div>
     </div>
+    </PageTransition>
   );
 };
 

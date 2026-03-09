@@ -5,6 +5,7 @@ import CategoryCard from "@/components/CategoryCard";
 import MachineItem from "@/components/MachineItem";
 import { Settings, FolderOpen, Search, ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import PageTransition from "@/components/PageTransition";
 
 const CatalogCategories = () => {
   const navigate = useNavigate();
@@ -26,6 +27,7 @@ const CatalogCategories = () => {
   const isSearching = search.trim().length > 0;
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-6xl px-4 py-12">
         <button
@@ -93,6 +95,7 @@ const CatalogCategories = () => {
         )}
       </div>
     </div>
+    </PageTransition>
   );
 };
 
