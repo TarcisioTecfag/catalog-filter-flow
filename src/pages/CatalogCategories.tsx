@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { categories, machines } from "@/data/machines";
 import CategoryCard from "@/components/CategoryCard";
 import MachineItem from "@/components/MachineItem";
-import { Settings, FolderOpen, Search } from "lucide-react";
+import { Settings, FolderOpen, Search, ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 const CatalogCategories = () => {
