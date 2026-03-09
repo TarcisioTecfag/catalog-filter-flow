@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { industrialLines } from "@/data/industrialLines";
+import type { LineMachine } from "@/data/industrialLines";
 import { ArrowLeft, ChevronRight, Layers3, Cog } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import PageTransition from "@/components/PageTransition";
+import MachineDetailModal from "@/components/MachineDetailModal";
 import NotFound from "./NotFound";
 
 const LineDetail = () => {
@@ -12,32 +14,23 @@ const LineDetail = () => {
   const line = industrialLines.find((l) => l.id === lineId);
   const [activeIndex, setActiveIndex] = useState<number>(Math.floor((line?.modules.length ?? 0) / 2));
   const [expandedModule, setExpandedModule] = useState<string | null>(null);
+  const [selectedMachine, setSelectedMachine] = useState<LineMachine | null>(null);
+  const [selectedModuleName, setSelectedModuleName] = useState<string>("");
 
   if (!line) return <NotFound />;
 
   const modules = line.modules;
-  const centerIndex = Math.floor(modules.length / 2);
 
   const getCardStyle = (index: number) => {
     const offset = index - activeIndex;
     const isActive = index === activeIndex;
-
-    // Fan-out positions
     const rotation = offset * 8;
     const translateX = offset * 120;
     const translateY = Math.abs(offset) * 15;
     const scale = isActive ? 1.05 : 0.9 - Math.abs(offset) * 0.03;
     const zIndex = isActive ? 50 : 40 - Math.abs(offset);
     const opacity = Math.abs(offset) > 2 ? 0.5 : 1;
-
-    return {
-      rotation,
-      translateX,
-      translateY,
-      scale,
-      zIndex,
-      opacity,
-    };
+    return { rotation, translateX, translateY, scale, zIndex, opacity };
   };
 
   const handleCardClick = (index: number) => {
@@ -47,6 +40,12 @@ const LineDetail = () => {
       setActiveIndex(index);
       setExpandedModule(null);
     }
+  };
+
+  const handleMachineClick = (machine: LineMachine, moduleName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedMachine(machine);
+    setSelectedModuleName(moduleName);
   };
 
   return (
@@ -76,7 +75,6 @@ const LineDetail = () => {
           {modules.map((module, index) => {
             const style = getCardStyle(index);
             const isActive = index === activeIndex;
-            const isExpanded = expandedModule === module.id;
 
             return (
               <motion.div
@@ -91,26 +89,17 @@ const LineDetail = () => {
                   zIndex: style.zIndex,
                   opacity: style.opacity,
                 }}
-                transition={{
-                  type: "spring",
-                  stiffness: 200,
-                  damping: 25,
-                  mass: 0.8,
-                }}
+                transition={{ type: "spring", stiffness: 200, damping: 25, mass: 0.8 }}
                 onClick={() => handleCardClick(index)}
                 whileHover={!isActive ? { scale: style.scale + 0.05, y: style.translateY - 10 } : {}}
               >
                 <div
-                  className={`
-                    w-[280px] rounded-xl border bg-card overflow-hidden
-                    transition-all duration-300
-                    ${isActive 
-                      ? "border-primary shadow-[0_0_30px_-5px_hsl(var(--primary)/0.4)]" 
+                  className={`w-[280px] rounded-xl border bg-card overflow-hidden transition-all duration-300 ${
+                    isActive
+                      ? "border-primary shadow-[0_0_30px_-5px_hsl(var(--primary)/0.4)]"
                       : "border-border hover:border-primary/30"
-                    }
-                  `}
+                  }`}
                 >
-                  {/* Card Header */}
                   <div className={`p-5 ${isActive ? "bg-primary/5" : ""}`}>
                     <div className="flex items-center gap-2 mb-2">
                       <div className={`h-8 w-8 rounded-lg flex items-center justify-center text-sm font-bold ${isActive ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
@@ -123,12 +112,9 @@ const LineDetail = () => {
                     <h3 className={`font-display text-base font-semibold ${isActive ? "text-primary" : "text-foreground"}`}>
                       {module.title.replace(/^Módulo \d+ — /, "")}
                     </h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {module.description}
-                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">{module.description}</p>
                   </div>
 
-                  {/* Machine List - Shows when active */}
                   <AnimatePresence>
                     {isActive && (
                       <motion.div
@@ -144,23 +130,23 @@ const LineDetail = () => {
                           </p>
                           <div className="space-y-2">
                             {module.machines.map((machine, mi) => (
-                              <motion.div
+                              <motion.button
                                 key={mi}
                                 initial={{ opacity: 0, x: -10 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ delay: mi * 0.05 }}
-                                className="flex items-start gap-2 rounded-lg bg-secondary/50 p-2.5"
+                                onClick={(e) => handleMachineClick(machine, module.title, e)}
+                                className="w-full flex items-start gap-2 rounded-lg bg-secondary/50 p-2.5 text-left hover:bg-secondary/80 hover:border-primary/30 border border-transparent transition-all group/machine"
                               >
-                                <Cog className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                                <div>
-                                  <p className="text-sm font-medium text-foreground leading-tight">
+                                <Cog className="h-4 w-4 text-primary mt-0.5 shrink-0 group-hover/machine:animate-spin" style={{ animationDuration: '2s' }} />
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-medium text-foreground leading-tight group-hover/machine:text-primary transition-colors">
                                     {machine.name}
                                   </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {machine.model}
-                                  </p>
+                                  <p className="text-xs text-muted-foreground">{machine.model}</p>
                                 </div>
-                              </motion.div>
+                                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 mt-0.5 shrink-0 group-hover/machine:text-primary transition-colors" />
+                              </motion.button>
                             ))}
                           </div>
                         </div>
@@ -180,9 +166,7 @@ const LineDetail = () => {
               key={index}
               onClick={() => { setActiveIndex(index); setExpandedModule(null); }}
               className={`h-2.5 rounded-full transition-all duration-300 ${
-                index === activeIndex
-                  ? "w-8 bg-primary"
-                  : "w-2.5 bg-secondary hover:bg-muted-foreground/30"
+                index === activeIndex ? "w-8 bg-primary" : "w-2.5 bg-secondary hover:bg-muted-foreground/30"
               }`}
             />
           ))}
@@ -212,9 +196,7 @@ const LineDetail = () => {
                     <h3 className="font-display text-base font-semibold text-primary">
                       {module.title.replace(/^Módulo \d+ — /, "")}
                     </h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {module.description}
-                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">{module.description}</p>
                   </div>
 
                   <div className="px-5 pb-5 border-t border-border">
@@ -223,20 +205,20 @@ const LineDetail = () => {
                     </p>
                     <div className="space-y-2">
                       {module.machines.map((machine, mi) => (
-                        <div
+                        <button
                           key={mi}
-                          className="flex items-start gap-2 rounded-lg bg-secondary/50 p-2.5"
+                          onClick={() => handleMachineClick(machine, module.title, { stopPropagation: () => {} } as React.MouseEvent)}
+                          className="w-full flex items-start gap-2 rounded-lg bg-secondary/50 p-2.5 text-left hover:bg-secondary/80 transition-all group/machine"
                         >
                           <Cog className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                          <div>
-                            <p className="text-sm font-medium text-foreground leading-tight">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-foreground leading-tight group-hover/machine:text-primary transition-colors">
                               {machine.name}
                             </p>
-                            <p className="text-xs text-muted-foreground">
-                              {machine.model}
-                            </p>
+                            <p className="text-xs text-muted-foreground">{machine.model}</p>
                           </div>
-                        </div>
+                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 mt-0.5 shrink-0" />
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -256,13 +238,11 @@ const LineDetail = () => {
               <div key={module.id} className="flex items-center gap-2">
                 <button
                   onClick={() => { setActiveIndex(index); setExpandedModule(null); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                  className={`
-                    rounded-lg border px-4 py-2.5 text-sm font-medium transition-all
-                    ${index === activeIndex
+                  className={`rounded-lg border px-4 py-2.5 text-sm font-medium transition-all ${
+                    index === activeIndex
                       ? "border-primary bg-primary/10 text-primary"
                       : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
-                    }
-                  `}
+                  }`}
                 >
                   {module.title.replace(/^Módulo \d+ — /, "")}
                 </button>
@@ -274,6 +254,14 @@ const LineDetail = () => {
           </div>
         </div>
       </div>
+
+      {/* Machine Detail Modal */}
+      <MachineDetailModal
+        machine={selectedMachine}
+        moduleName={selectedModuleName}
+        open={!!selectedMachine}
+        onClose={() => setSelectedMachine(null)}
+      />
     </div>
     </PageTransition>
   );
