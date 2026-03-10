@@ -19,6 +19,7 @@ export interface LineMachine {
   youtubeUrl?: string;
   images?: string[];
   usageInLine?: string;
+  manualUrl?: string;
 }
 
 export interface LineModule {
