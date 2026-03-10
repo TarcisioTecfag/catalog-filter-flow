@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { X, Play, ChevronLeft, ChevronRight, Cog, Info, Image as ImageIcon, Video, Wrench, ExternalLink } from "lucide-react";
+import { useState, useRef } from "react";
+import { X, Play, ChevronLeft, ChevronRight, Cog, Info, Image as ImageIcon, Video, Wrench, FileText, Download, Upload } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { LineMachine } from "@/data/industrialLines";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -16,6 +16,7 @@ interface MachineDetailModalProps {
 const MachineDetailModal = ({ machine, moduleName, open, onClose }: MachineDetailModalProps) => {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<"info" | "specs" | "usage">("info");
+  const galleryRef = useRef<HTMLDivElement>(null);
 
   if (!machine) return null;
 
@@ -29,6 +30,15 @@ const MachineDetailModal = ({ machine, moduleName, open, onClose }: MachineDetai
     return match ? `https://www.youtube.com/embed/${match[1]}` : url;
   };
 
+  const scrollGallery = (direction: "left" | "right") => {
+    if (!galleryRef.current) return;
+    const scrollAmount = 220;
+    galleryRef.current.scrollBy({
+      left: direction === "left" ? -scrollAmount : scrollAmount,
+      behavior: "smooth",
+    });
+  };
+
   const tabs = [
     { id: "info" as const, label: "Informações", icon: Info },
     { id: "specs" as const, label: "Especificações", icon: Wrench },
@@ -37,7 +47,7 @@ const MachineDetailModal = ({ machine, moduleName, open, onClose }: MachineDetai
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-3xl p-0 gap-0 bg-card border-border overflow-hidden max-h-[90vh]">
+      <DialogContent className="max-w-4xl p-0 gap-0 bg-card border-border overflow-hidden max-h-[90vh]">
         {/* Header */}
         <div className="px-6 pt-6 pb-4 border-b border-border">
           <div className="flex items-start justify-between gap-4">
@@ -59,16 +69,16 @@ const MachineDetailModal = ({ machine, moduleName, open, onClose }: MachineDetai
 
         <ScrollArea className="max-h-[calc(90vh-120px)]">
           <div className="p-6 space-y-6">
-            {/* YouTube Video */}
-            {hasVideo && (
-              <section>
-                <div className="flex items-center gap-2 mb-3">
-                  <Video className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">
-                    Vídeo
-                  </h3>
-                </div>
-                <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-secondary border border-border">
+            {/* YouTube Video - Compact */}
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <Video className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">
+                  Vídeo
+                </h3>
+              </div>
+              {hasVideo ? (
+                <div className="relative w-full max-w-xl mx-auto aspect-video rounded-lg overflow-hidden bg-secondary border border-border">
                   <iframe
                     src={getYoutubeEmbedUrl(machine.youtubeUrl!)}
                     title={`Vídeo - ${machine.name}`}
@@ -77,28 +87,17 @@ const MachineDetailModal = ({ machine, moduleName, open, onClose }: MachineDetai
                     allowFullScreen
                   />
                 </div>
-              </section>
-            )}
-
-            {/* Video placeholder when no video */}
-            {!hasVideo && (
-              <section>
-                <div className="flex items-center gap-2 mb-3">
-                  <Video className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">
-                    Vídeo
-                  </h3>
-                </div>
-                <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-secondary/50 border border-border border-dashed flex items-center justify-center">
+              ) : (
+                <div className="relative w-full max-w-xl mx-auto aspect-video rounded-lg overflow-hidden bg-secondary/50 border border-border border-dashed flex items-center justify-center">
                   <div className="text-center text-muted-foreground">
                     <Play className="h-10 w-10 mx-auto mb-2 opacity-30" />
                     <p className="text-sm">Vídeo em breve</p>
                   </div>
                 </div>
-              </section>
-            )}
+              )}
+            </section>
 
-            {/* Photo Gallery */}
+            {/* Netflix-style Gallery */}
             <section>
               <div className="flex items-center gap-2 mb-3">
                 <ImageIcon className="h-4 w-4 text-primary" />
@@ -107,60 +106,115 @@ const MachineDetailModal = ({ machine, moduleName, open, onClose }: MachineDetai
                 </h3>
               </div>
               {hasImages ? (
-                <div className="space-y-3">
-                  {/* Main Image */}
-                  <div className="relative w-full aspect-[4/3] rounded-lg overflow-hidden bg-secondary border border-border">
-                    <AnimatePresence mode="wait">
-                      <motion.img
-                        key={activeImageIndex}
-                        src={machine.images![activeImageIndex]}
-                        alt={`${machine.name} - Imagem ${activeImageIndex + 1}`}
-                        className="w-full h-full object-cover"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                      />
-                    </AnimatePresence>
-                    {machine.images!.length > 1 && (
-                      <>
-                        <button
-                          onClick={() => setActiveImageIndex((i) => (i - 1 + machine.images!.length) % machine.images!.length)}
-                          className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center text-foreground hover:bg-background transition-colors"
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => setActiveImageIndex((i) => (i + 1) % machine.images!.length)}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center text-foreground hover:bg-background transition-colors"
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                  {/* Thumbnails */}
-                  {machine.images!.length > 1 && (
-                    <div className="flex gap-2 overflow-x-auto pb-1">
-                      {machine.images!.map((img, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setActiveImageIndex(i)}
-                          className={`shrink-0 w-16 h-16 rounded-md overflow-hidden border-2 transition-colors ${
-                            i === activeImageIndex ? "border-primary" : "border-border hover:border-primary/50"
-                          }`}
-                        >
-                          <img src={img} alt={`Miniatura ${i + 1}`} className="w-full h-full object-cover" />
-                        </button>
-                      ))}
+                <div className="relative group">
+                  {/* Scroll buttons */}
+                  <button
+                    onClick={() => scrollGallery("left")}
+                    className="absolute left-0 top-0 bottom-0 z-10 w-10 bg-gradient-to-r from-card to-transparent flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <div className="h-8 w-8 rounded-full bg-background/90 backdrop-blur-sm flex items-center justify-center shadow-md">
+                      <ChevronLeft className="h-4 w-4 text-foreground" />
                     </div>
-                  )}
+                  </button>
+                  <button
+                    onClick={() => scrollGallery("right")}
+                    className="absolute right-0 top-0 bottom-0 z-10 w-10 bg-gradient-to-l from-card to-transparent flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <div className="h-8 w-8 rounded-full bg-background/90 backdrop-blur-sm flex items-center justify-center shadow-md">
+                      <ChevronRight className="h-4 w-4 text-foreground" />
+                    </div>
+                  </button>
+
+                  {/* Scrollable row */}
+                  <div
+                    ref={galleryRef}
+                    className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 snap-x snap-mandatory"
+                    style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+                  >
+                    {machine.images!.map((img, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setActiveImageIndex(i)}
+                        className={`shrink-0 snap-start rounded-lg overflow-hidden border-2 transition-all duration-200 hover:scale-105 hover:shadow-lg ${
+                          i === activeImageIndex
+                            ? "border-primary shadow-md shadow-primary/20"
+                            : "border-border hover:border-primary/50"
+                        }`}
+                      >
+                        <img
+                          src={img}
+                          alt={`${machine.name} - Imagem ${i + 1}`}
+                          className="w-[200px] h-[140px] object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ) : (
-                <div className="w-full aspect-[4/3] rounded-lg bg-secondary/50 border border-border border-dashed flex items-center justify-center">
-                  <div className="text-center text-muted-foreground">
-                    <ImageIcon className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                    <p className="text-sm">Imagens em breve</p>
+                <div className="flex gap-3 overflow-x-auto pb-2">
+                  <div className="shrink-0 w-[200px] h-[140px] rounded-lg bg-secondary/50 border border-border border-dashed flex items-center justify-center">
+                    <div className="text-center text-muted-foreground">
+                      <ImageIcon className="h-8 w-8 mx-auto mb-1 opacity-30" />
+                      <p className="text-xs">Em breve</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Selected image preview */}
+              {hasImages && (
+                <div className="mt-3 relative w-full aspect-[16/9] max-w-xl mx-auto rounded-lg overflow-hidden bg-secondary border border-border">
+                  <AnimatePresence mode="wait">
+                    <motion.img
+                      key={activeImageIndex}
+                      src={machine.images![activeImageIndex]}
+                      alt={`${machine.name} - Imagem ${activeImageIndex + 1}`}
+                      className="w-full h-full object-contain"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                    />
+                  </AnimatePresence>
+                  <div className="absolute bottom-2 right-2 bg-background/80 backdrop-blur-sm rounded-md px-2 py-1 text-xs text-muted-foreground">
+                    {activeImageIndex + 1} / {machine.images!.length}
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {/* Manual / Documentation */}
+            <section>
+              <div className="flex items-center gap-2 mb-3">
+                <FileText className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">
+                  Manual da Máquina
+                </h3>
+              </div>
+              {machine.manualUrl ? (
+                <a
+                  href={machine.manualUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-4 rounded-lg border border-border bg-secondary/30 hover:bg-secondary/60 transition-colors group"
+                >
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                    <Download className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-foreground">Baixar Manual</p>
+                    <p className="text-xs text-muted-foreground">PDF com especificações completas e instruções de operação</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                </a>
+              ) : (
+                <div className="flex items-center gap-3 p-4 rounded-lg border border-border border-dashed bg-secondary/20">
+                  <div className="h-10 w-10 rounded-lg bg-secondary/50 flex items-center justify-center shrink-0">
+                    <Upload className="h-5 w-5 text-muted-foreground/50" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-muted-foreground">Manual não disponível</p>
+                    <p className="text-xs text-muted-foreground/70">O manual desta máquina será adicionado em breve</p>
                   </div>
                 </div>
               )}
