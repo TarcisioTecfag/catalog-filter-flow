@@ -12,6 +12,7 @@ import CatalogCategories from "./pages/CatalogCategories";
 import CatalogMachines from "./pages/CatalogMachines";
 import IndustrialLines from "./pages/IndustrialLines";
 import LineDetail from "./pages/LineDetail";
+import CreateLine from "./pages/CreateLine";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const AnimatedRoutes = () => {
         <Route path="/catalogo/:categoryId" element={<CatalogMachines />} />
         <Route path="/linhas-industriais" element={<IndustrialLines />} />
         <Route path="/linhas-industriais/:lineId" element={<LineDetail />} />
+        <Route path="/criar-linha" element={<CreateLine />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AnimatePresence>
