@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useCallback, DragEvent, MouseEvent } from "react";
+import { useState, useRef, useMemo, useCallback, useEffect, DragEvent, MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -15,12 +15,15 @@ import {
   User as UserIcon,
   Wand2,
   AlertTriangle,
+  ImageIcon,
 } from "lucide-react";
 import PageTransition from "@/components/PageTransition";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { categories, machines, type Machine } from "@/data/machines";
+import type { LineMachine } from "@/data/industrialLines";
+import MachineDetailModal from "@/components/MachineDetailModal";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -43,8 +46,16 @@ interface ChatMessage {
   content: string;
 }
 
-const NODE_W = 200;
-const NODE_H = 88;
+const NODE_W = 180;
+const NODE_H = 200;
+
+// Pseudo-random but stable hue per machine id, used to create a colored
+// "photo" placeholder so the card looks visual even without real images.
+const hueFromId = (id: string) => {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360;
+  return h;
+};
 
 const CreateLine = () => {
   const navigate = useNavigate();
@@ -59,8 +70,21 @@ const CreateLine = () => {
   const [edges, setEdges] = useState<FlowEdge[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
-  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+  // modal
+  const [openMachine, setOpenMachine] = useState<LineMachine | null>(null);
+
+  // ---- Smooth drag with refs + rAF (no React state per mousemove) ----
+  const draggingRef = useRef<{
+    nodeId: string;
+    offsetX: number;
+    offsetY: number;
+    rafId: number | null;
+    nextX: number;
+    nextY: number;
+    moved: boolean;
+  } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   // chat state
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
@@ -93,6 +117,24 @@ const CreateLine = () => {
     return map;
   }, []);
 
+  // Convert catalog Machine -> LineMachine shape expected by the modal
+  const toLineMachine = useCallback((m: Machine): LineMachine => {
+    return {
+      name: m.name,
+      model: m.model,
+      description:
+        `Equipamento da categoria ${m.subcategory}. Cadastrado no catálogo geral com tags: ${m.tags.join(", ") || "—"}.`,
+      features: m.tags,
+      specs: [
+        { label: "Categoria", value: m.subcategory },
+        { label: "Modelo", value: m.model },
+      ],
+      images: [],
+      usageInLine:
+        "Esta máquina foi adicionada ao seu fluxo personalizado. Configure a posição e as conexões para definir como ela se integra à linha.",
+    };
+  }, []);
+
   // ===== Drag from sidebar =====
   const handleSidebarDragStart = (e: DragEvent<HTMLDivElement>, machineId: string) => {
     e.dataTransfer.setData("machineId", machineId);
@@ -122,38 +164,77 @@ const CreateLine = () => {
     toast.success("Máquina adicionada ao fluxo");
   };
 
-  // ===== Move existing node =====
-  const handleNodeMouseDown = (e: MouseEvent<HTMLDivElement>, node: FlowNode) => {
-    if (connectingFrom) return; // don't drag while connecting
+  // ===== Smooth move of existing node (pointer events + rAF + refs) =====
+  const applyDragFrame = useCallback(() => {
+    const drag = draggingRef.current;
+    if (!drag) return;
+    drag.rafId = null;
+    const el = document.getElementById(`flow-node-${drag.nodeId}`);
+    if (el) {
+      el.style.transform = `translate3d(${drag.nextX}px, ${drag.nextY}px, 0)`;
+    }
+    // also move SVG edges by re-rendering — cheap because we throttle to rAF.
+    setNodes((prev) =>
+      prev.map((n) =>
+        n.id === drag.nodeId ? { ...n, x: drag.nextX, y: drag.nextY } : n,
+      ),
+    );
+  }, []);
+
+  const handleNodePointerDown = (e: React.PointerEvent<HTMLDivElement>, node: FlowNode) => {
+    if (connectingFrom) return;
+    if (e.button !== 0) return;
     e.stopPropagation();
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
-    setDraggingNodeId(node.id);
-    setDragOffset({
-      x: e.clientX - rect.left - node.x,
-      y: e.clientY - rect.top - node.y,
-    });
+    draggingRef.current = {
+      nodeId: node.id,
+      offsetX: e.clientX - rect.left - node.x,
+      offsetY: e.clientY - rect.top - node.y,
+      rafId: null,
+      nextX: node.x,
+      nextY: node.y,
+      moved: false,
+    };
     setSelectedNodeId(node.id);
+    setIsDragging(true);
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
   };
 
-  const handleCanvasMouseMove = (e: MouseEvent<HTMLDivElement>) => {
-    if (!draggingNodeId) return;
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const newX = e.clientX - rect.left - dragOffset.x;
-    const newY = e.clientY - rect.top - dragOffset.y;
-    setNodes((prev) =>
-      prev.map((n) =>
-        n.id === draggingNodeId
-          ? { ...n, x: Math.max(0, Math.min(rect.width - NODE_W, newX)), y: Math.max(0, Math.min(rect.height - NODE_H, newY)) }
-          : n,
-      ),
-    );
-  };
-
-  const handleCanvasMouseUp = () => {
-    setDraggingNodeId(null);
-  };
+  useEffect(() => {
+    const onMove = (ev: PointerEvent) => {
+      const drag = draggingRef.current;
+      if (!drag) return;
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const newX = Math.max(0, Math.min(rect.width - NODE_W, ev.clientX - rect.left - drag.offsetX));
+      const newY = Math.max(0, Math.min(rect.height - NODE_H, ev.clientY - rect.top - drag.offsetY));
+      drag.nextX = newX;
+      drag.nextY = newY;
+      drag.moved = true;
+      if (drag.rafId == null) {
+        drag.rafId = requestAnimationFrame(applyDragFrame);
+      }
+    };
+    const onUp = () => {
+      const drag = draggingRef.current;
+      if (!drag) return;
+      if (drag.rafId != null) cancelAnimationFrame(drag.rafId);
+      // commit final position to state (clears inline transform via re-render)
+      const el = document.getElementById(`flow-node-${drag.nodeId}`);
+      if (el) el.style.transform = "";
+      draggingRef.current = null;
+      setIsDragging(false);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [applyDragFrame]);
 
   const handleCanvasClick = () => {
     setSelectedNodeId(null);
@@ -170,7 +251,6 @@ const CreateLine = () => {
   const handleNodeClick = (e: MouseEvent, nodeId: string) => {
     e.stopPropagation();
     if (connectingFrom && connectingFrom !== nodeId) {
-      // create edge if not exists
       const exists = edges.some((ed) => ed.source === connectingFrom && ed.target === nodeId);
       if (!exists) {
         setEdges((prev) => [
@@ -183,6 +263,13 @@ const CreateLine = () => {
     } else {
       setSelectedNodeId(nodeId);
     }
+  };
+
+  const handleNodeDoubleClick = (e: MouseEvent, machineId: string) => {
+    e.stopPropagation();
+    const m = machineMap.get(machineId);
+    if (!m) return;
+    setOpenMachine(toLineMachine(m));
   };
 
   const deleteNode = (nodeId: string) => {
@@ -226,7 +313,7 @@ const CreateLine = () => {
     });
   };
 
-  // ===== Chat with Fagner (mock) =====
+  // ===== Chat (mock) =====
   const generateFagnerReply = useCallback(
     (userMsg: string, currentNodes: FlowNode[]): string => {
       const lower = userMsg.toLowerCase();
@@ -246,7 +333,7 @@ const CreateLine = () => {
 
       if (lower.includes("envase") || lower.includes("liquido") || lower.includes("líquido")) {
         return "Para uma linha de envase de líquidos, sugiro:\n\n1️⃣ Esteira transportadora inox\n2️⃣ Envasadora de líquidos (4 ou 6 bicos)\n3️⃣ Rosqueadora automática linear\n4️⃣ Rotuladora\n5️⃣ Datadora\n6️⃣ Encartuchadeira\n\nQuer que eu sugira modelos específicos do nosso catálogo?";
-        }
+      }
 
       if (lower.includes("erro") || lower.includes("defeito") || lower.includes("problema")) {
         return "Os defeitos mais comuns em linhas industriais são:\n\n🔴 Desincronização de velocidade entre máquinas\n🔴 Falta de sensor de presença antes do envase\n🔴 Esteiras subdimensionadas para o pico de produção\n🔴 Ausência de inspeção visual após rotulagem\n\nMe diga qual etapa você quer otimizar e te ajudo a prevenir.";
@@ -268,16 +355,10 @@ const CreateLine = () => {
   const sendChat = () => {
     const text = chatInput.trim();
     if (!text || chatLoading) return;
-    const userMsg: ChatMessage = {
-      id: `m_${Date.now()}`,
-      role: "user",
-      content: text,
-    };
+    const userMsg: ChatMessage = { id: `m_${Date.now()}`, role: "user", content: text };
     setChatMessages((prev) => [...prev, userMsg]);
     setChatInput("");
     setChatLoading(true);
-
-    // simulate Fagner thinking
     setTimeout(() => {
       const reply: ChatMessage = {
         id: `m_${Date.now() + 1}`,
@@ -321,7 +402,6 @@ const CreateLine = () => {
           </div>
         </header>
 
-        {/* Main 3-column layout */}
         <div className="flex-1 flex min-h-0">
           {/* LEFT: Catalog */}
           <aside className="w-[280px] flex-shrink-0 border-r border-border bg-card/30 flex flex-col">
@@ -386,7 +466,7 @@ const CreateLine = () => {
             </ScrollArea>
             <div className="p-2 border-t border-border bg-muted/20">
               <p className="text-[10px] text-muted-foreground text-center">
-                💡 Arraste para o canvas
+                💡 Arraste para o canvas · duplo clique abre detalhes
               </p>
             </div>
           </aside>
@@ -397,9 +477,6 @@ const CreateLine = () => {
               ref={canvasRef}
               onDragOver={handleCanvasDragOver}
               onDrop={handleCanvasDrop}
-              onMouseMove={handleCanvasMouseMove}
-              onMouseUp={handleCanvasMouseUp}
-              onMouseLeave={handleCanvasMouseUp}
               onClick={handleCanvasClick}
               className="absolute inset-0"
             >
@@ -445,49 +522,66 @@ const CreateLine = () => {
                 if (!machine) return null;
                 const isSelected = selectedNodeId === node.id;
                 const isConnectingSrc = connectingFrom === node.id;
+                const hue = hueFromId(machine.id);
+                const isThisDragging =
+                  isDragging && draggingRef.current?.nodeId === node.id;
                 return (
                   <div
                     key={node.id}
+                    id={`flow-node-${node.id}`}
                     style={{
-                      left: node.x,
-                      top: node.y,
+                      left: 0,
+                      top: 0,
                       width: NODE_W,
                       height: NODE_H,
+                      transform: `translate3d(${node.x}px, ${node.y}px, 0)`,
+                      willChange: isThisDragging ? "transform" : undefined,
+                      transition: isThisDragging ? "none" : "box-shadow 150ms, border-color 150ms",
+                      touchAction: "none",
+                      zIndex: isSelected || isThisDragging ? 30 : 10,
                     }}
-                    onMouseDown={(e) => handleNodeMouseDown(e, node)}
+                    onPointerDown={(e) => handleNodePointerDown(e, node)}
                     onClick={(e) => handleNodeClick(e, node.id)}
+                    onDoubleClick={(e) => handleNodeDoubleClick(e, node.machineId)}
                     className={cn(
-                      "absolute rounded-lg border-2 bg-card shadow-lg cursor-move select-none transition-all",
+                      "absolute rounded-xl border-2 bg-card shadow-lg cursor-grab active:cursor-grabbing select-none overflow-hidden",
                       isSelected
-                        ? "border-primary shadow-[0_0_20px_-5px_hsl(var(--primary)/0.5)]"
-                        : "border-border hover:border-primary/50",
+                        ? "border-primary shadow-[0_0_24px_-4px_hsl(var(--primary)/0.55)]"
+                        : "border-border hover:border-primary/60",
                       isConnectingSrc && "ring-2 ring-primary ring-offset-2 ring-offset-background",
                     )}
+                    title="Duplo clique para ver detalhes"
                   >
-                    <div className="p-2.5 h-full flex flex-col justify-between">
-                      <div>
-                        <p className="text-[11px] font-semibold text-foreground line-clamp-2 leading-tight">
-                          {machine.name}
-                        </p>
-                        <p className="text-[9px] text-muted-foreground font-mono mt-0.5">
-                          {machine.model}
-                        </p>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] text-muted-foreground truncate">
-                          {machine.subcategory}
-                        </span>
-                      </div>
+                    {/* "Photo" area — colored placeholder per machine */}
+                    <div
+                      className="relative h-[140px] w-full flex items-center justify-center"
+                      style={{
+                        background: `linear-gradient(135deg, hsl(${hue} 55% 22%) 0%, hsl(${(hue + 40) % 360} 60% 14%) 100%)`,
+                      }}
+                    >
+                      <ImageIcon className="h-10 w-10 text-white/30" />
+                      <span className="absolute top-1.5 left-1.5 text-[9px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-white/80 backdrop-blur-sm">
+                        {machine.model}
+                      </span>
                     </div>
+
+                    {/* Name only */}
+                    <div className="px-2.5 py-2 h-[60px] flex items-center">
+                      <p className="text-[11px] font-semibold text-foreground line-clamp-2 leading-tight">
+                        {machine.name}
+                      </p>
+                    </div>
+
                     {/* connection handle right */}
                     <button
                       onClick={(e) => startConnection(e, node.id)}
+                      onPointerDown={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
                       title="Conectar a outra máquina"
-                      className="absolute -right-2 top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-primary border-2 border-background hover:scale-125 transition-transform"
+                      className="absolute -right-2 top-[70px] h-4 w-4 rounded-full bg-primary border-2 border-background hover:scale-125 transition-transform z-10"
                     />
                     {/* input handle left */}
-                    <div className="absolute -left-2 top-1/2 -translate-y-1/2 h-3 w-3 rounded-full bg-muted border-2 border-background" />
+                    <div className="absolute -left-2 top-[70px] h-3 w-3 rounded-full bg-muted border-2 border-background" />
 
                     {isSelected && (
                       <button
@@ -495,7 +589,8 @@ const CreateLine = () => {
                           e.stopPropagation();
                           deleteNode(node.id);
                         }}
-                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-md hover:scale-110 transition-transform"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-md hover:scale-110 transition-transform z-20"
                         title="Remover"
                       >
                         <X className="h-3.5 w-3.5" />
@@ -506,7 +601,7 @@ const CreateLine = () => {
               })}
 
               {connectingFrom && (
-                <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 pointer-events-none">
+                <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 pointer-events-none z-40">
                   <Link2 className="h-3 w-3" />
                   Clique em uma máquina para conectar
                 </div>
@@ -640,6 +735,14 @@ const CreateLine = () => {
           </aside>
         </div>
       </div>
+
+      {/* Machine details modal (reused from Industrial Lines) */}
+      <MachineDetailModal
+        machine={openMachine}
+        moduleName="Fluxo personalizado"
+        open={!!openMachine}
+        onClose={() => setOpenMachine(null)}
+      />
     </PageTransition>
   );
 };
