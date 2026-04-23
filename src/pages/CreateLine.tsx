@@ -207,7 +207,7 @@ const CreateLine = () => {
       const src = livePositionsRef.current.get(sourceId);
       const tgt = livePositionsRef.current.get(targetId);
       if (!src || !tgt) return;
-      const pathEl = document.getElementById(`flow-edge-${edgeId}`) as SVGPathElement | null;
+      const pathEl = document.getElementById(`flow-edge-${edgeId}`) as unknown as SVGPathElement | null;
       if (pathEl) {
         pathEl.setAttribute("d", buildEdgePath(src.x, src.y, tgt.x, tgt.y));
       }
