@@ -336,15 +336,11 @@ const CreateLine = () => {
       const src = nodes.find((n) => n.id === edge.source);
       const tgt = nodes.find((n) => n.id === edge.target);
       if (!src || !tgt) return null;
-      const x1 = src.x + NODE_W;
-      const y1 = src.y + NODE_H / 2;
-      const x2 = tgt.x;
-      const y2 = tgt.y + NODE_H / 2;
-      const dx = Math.abs(x2 - x1) * 0.5;
-      const path = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+      const path = buildEdgePath(src.x, src.y, tgt.x, tgt.y);
       return (
         <g key={edge.id}>
           <path
+            id={`flow-edge-${edge.id}`}
             d={path}
             fill="none"
             stroke="hsl(var(--primary))"
