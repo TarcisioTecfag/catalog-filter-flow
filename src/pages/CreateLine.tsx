@@ -83,6 +83,7 @@ const CreateLine = () => {
     nextX: number;
     nextY: number;
     moved: boolean;
+    affectedEdges: { edgeId: string; sourceId: string; targetId: string }[];
   } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
