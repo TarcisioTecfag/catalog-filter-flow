@@ -164,21 +164,53 @@ const CreateLine = () => {
     toast.success("Máquina adicionada ao fluxo");
   };
 
-  // ===== Smooth move of existing node (pointer events + rAF + refs) =====
+  // Live positions used by the drag loop. Kept in a ref so we can update the
+  // DOM (node transform + SVG paths) inside rAF without triggering React re-renders
+  // on every mouse move. Synced to React state on drag end.
+  const livePositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+
+  // Keep live positions in sync whenever React state changes (add/remove/commit).
+  useEffect(() => {
+    const map = new Map<string, { x: number; y: number }>();
+    nodes.forEach((n) => map.set(n.id, { x: n.x, y: n.y }));
+    livePositionsRef.current = map;
+  }, [nodes]);
+
+  // Build the cubic bezier path string between two nodes given their top-left positions.
+  const buildEdgePath = (sx: number, sy: number, tx: number, ty: number) => {
+    const x1 = sx + NODE_W;
+    const y1 = sy + NODE_H / 2;
+    const x2 = tx;
+    const y2 = ty + NODE_H / 2;
+    const dx = Math.abs(x2 - x1) * 0.5;
+    return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+  };
+
+  // ===== Smooth move of existing node (pointer events + rAF + DOM mutation) =====
   const applyDragFrame = useCallback(() => {
     const drag = draggingRef.current;
     if (!drag) return;
     drag.rafId = null;
+
+    // 1) Move the node element directly via transform.
     const el = document.getElementById(`flow-node-${drag.nodeId}`);
     if (el) {
       el.style.transform = `translate3d(${drag.nextX}px, ${drag.nextY}px, 0)`;
     }
-    // also move SVG edges by re-rendering — cheap because we throttle to rAF.
-    setNodes((prev) =>
-      prev.map((n) =>
-        n.id === drag.nodeId ? { ...n, x: drag.nextX, y: drag.nextY } : n,
-      ),
-    );
+
+    // 2) Update the live position map so edge calculations see the new coords.
+    livePositionsRef.current.set(drag.nodeId, { x: drag.nextX, y: drag.nextY });
+
+    // 3) Update only the affected SVG paths in place (no React re-render).
+    drag.affectedEdges.forEach(({ edgeId, sourceId, targetId }) => {
+      const src = livePositionsRef.current.get(sourceId);
+      const tgt = livePositionsRef.current.get(targetId);
+      if (!src || !tgt) return;
+      const pathEl = document.getElementById(`flow-edge-${edgeId}`) as SVGPathElement | null;
+      if (pathEl) {
+        pathEl.setAttribute("d", buildEdgePath(src.x, src.y, tgt.x, tgt.y));
+      }
+    });
   }, []);
 
   const handleNodePointerDown = (e: React.PointerEvent<HTMLDivElement>, node: FlowNode) => {
@@ -187,6 +219,10 @@ const CreateLine = () => {
     e.stopPropagation();
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
+    // Pre-compute which edges touch this node so we don't filter on every frame.
+    const affectedEdges = edges
+      .filter((ed) => ed.source === node.id || ed.target === node.id)
+      .map((ed) => ({ edgeId: ed.id, sourceId: ed.source, targetId: ed.target }));
     draggingRef.current = {
       nodeId: node.id,
       offsetX: e.clientX - rect.left - node.x,
@@ -195,6 +231,7 @@ const CreateLine = () => {
       nextX: node.x,
       nextY: node.y,
       moved: false,
+      affectedEdges,
     };
     setSelectedNodeId(node.id);
     setIsDragging(true);
@@ -220,11 +257,17 @@ const CreateLine = () => {
       const drag = draggingRef.current;
       if (!drag) return;
       if (drag.rafId != null) cancelAnimationFrame(drag.rafId);
-      // commit final position to state (clears inline transform via re-render)
-      const el = document.getElementById(`flow-node-${drag.nodeId}`);
-      if (el) el.style.transform = "";
+      const finalX = drag.nextX;
+      const finalY = drag.nextY;
+      const nodeId = drag.nodeId;
       draggingRef.current = null;
       setIsDragging(false);
+      // Commit final position to React state. The node's inline transform stays
+      // valid because we render nodes using the same translate3d formula, so
+      // there's no visible jump between DOM-driven drag and React-rendered state.
+      setNodes((prev) =>
+        prev.map((n) => (n.id === nodeId ? { ...n, x: finalX, y: finalY } : n)),
+      );
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
