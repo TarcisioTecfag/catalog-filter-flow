@@ -521,7 +521,7 @@ const CreateLine = () => {
                 <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
                   <Bot className="h-4 w-4 text-primary-foreground" />
                 </div>
-                <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-card" aria-hidden />
+                <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-primary border-2 border-card" aria-hidden />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold flex items-center gap-1.5">
