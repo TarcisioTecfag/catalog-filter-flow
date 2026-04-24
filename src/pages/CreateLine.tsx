@@ -244,14 +244,16 @@ const CreateLine = () => {
     e.stopPropagation();
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
+    const z = zoomRef.current;
     // Pre-compute which edges touch this node so we don't filter on every frame.
     const affectedEdges = edges
       .filter((ed) => ed.source === node.id || ed.target === node.id)
       .map((ed) => ({ edgeId: ed.id, sourceId: ed.source, targetId: ed.target }));
     draggingRef.current = {
       nodeId: node.id,
-      offsetX: e.clientX - rect.left - node.x,
-      offsetY: e.clientY - rect.top - node.y,
+      // offsets are in content (unzoomed) coordinates
+      offsetX: (e.clientX - rect.left) / z - node.x,
+      offsetY: (e.clientY - rect.top) / z - node.y,
       rafId: null,
       nextX: node.x,
       nextY: node.y,
@@ -269,8 +271,12 @@ const CreateLine = () => {
       if (!drag) return;
       const rect = canvasRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const newX = Math.max(0, Math.min(rect.width - NODE_W, ev.clientX - rect.left - drag.offsetX));
-      const newY = Math.max(0, Math.min(rect.height - NODE_H, ev.clientY - rect.top - drag.offsetY));
+      const z = zoomRef.current;
+      // Translate viewport pointer to content coordinates by dividing by zoom.
+      const contentW = rect.width / z;
+      const contentH = rect.height / z;
+      const newX = Math.max(0, Math.min(contentW - NODE_W, (ev.clientX - rect.left) / z - drag.offsetX));
+      const newY = Math.max(0, Math.min(contentH - NODE_H, (ev.clientY - rect.top) / z - drag.offsetY));
       drag.nextX = newX;
       drag.nextY = newY;
       drag.moved = true;
