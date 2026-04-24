@@ -732,13 +732,14 @@ const CreateLine = () => {
             >
               {/* Zoom + pan content layer */}
               <div
+                id="flow-canvas-wrapper"
                 className="absolute top-0 left-0 origin-top-left"
                 style={{
                   transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
-                  // give the wrapper a huge logical size so nodes can sit anywhere
                   width: "10000px",
                   height: "10000px",
-                  transition: isDragging || panDragRef.current ? "none" : "transform 120ms ease-out",
+                  transition: isDragging || isPanning ? "none" : "transform 120ms ease-out",
+                  willChange: isPanning || isDragging ? "transform" : undefined,
                   pointerEvents: isPanActive ? "none" : undefined,
                 }}
               >
