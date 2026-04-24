@@ -23,6 +23,7 @@ import {
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
+  Hand,
 } from "lucide-react";
 import PageTransition from "@/components/PageTransition";
 import { Input } from "@/components/ui/input";
