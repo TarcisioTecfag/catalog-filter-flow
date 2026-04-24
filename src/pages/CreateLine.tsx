@@ -16,6 +16,13 @@ import {
   Wand2,
   AlertTriangle,
   ImageIcon,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
 } from "lucide-react";
 import PageTransition from "@/components/PageTransition";
 import { Input } from "@/components/ui/input";
@@ -73,6 +80,22 @@ const CreateLine = () => {
 
   // modal
   const [openMachine, setOpenMachine] = useState<LineMachine | null>(null);
+
+  // zoom + panels
+  const ZOOM_MIN = 0.4;
+  const ZOOM_MAX = 2;
+  const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(1);
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(true);
+
+  const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
+  const zoomIn = () => setZoom((z) => clampZoom(parseFloat((z + 0.1).toFixed(2))));
+  const zoomOut = () => setZoom((z) => clampZoom(parseFloat((z - 0.1).toFixed(2))));
+  const zoomReset = () => setZoom(1);
 
   // ---- Smooth drag with refs + rAF (no React state per mousemove) ----
   const draggingRef = useRef<{
@@ -153,8 +176,9 @@ const CreateLine = () => {
     if (!machineId) return;
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const x = e.clientX - rect.left - NODE_W / 2;
-    const y = e.clientY - rect.top - NODE_H / 2;
+    const z = zoomRef.current;
+    const x = (e.clientX - rect.left) / z - NODE_W / 2;
+    const y = (e.clientY - rect.top) / z - NODE_H / 2;
     const newNode: FlowNode = {
       id: `n_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       machineId,
@@ -220,14 +244,16 @@ const CreateLine = () => {
     e.stopPropagation();
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
+    const z = zoomRef.current;
     // Pre-compute which edges touch this node so we don't filter on every frame.
     const affectedEdges = edges
       .filter((ed) => ed.source === node.id || ed.target === node.id)
       .map((ed) => ({ edgeId: ed.id, sourceId: ed.source, targetId: ed.target }));
     draggingRef.current = {
       nodeId: node.id,
-      offsetX: e.clientX - rect.left - node.x,
-      offsetY: e.clientY - rect.top - node.y,
+      // offsets are in content (unzoomed) coordinates
+      offsetX: (e.clientX - rect.left) / z - node.x,
+      offsetY: (e.clientY - rect.top) / z - node.y,
       rafId: null,
       nextX: node.x,
       nextY: node.y,
@@ -245,8 +271,12 @@ const CreateLine = () => {
       if (!drag) return;
       const rect = canvasRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const newX = Math.max(0, Math.min(rect.width - NODE_W, ev.clientX - rect.left - drag.offsetX));
-      const newY = Math.max(0, Math.min(rect.height - NODE_H, ev.clientY - rect.top - drag.offsetY));
+      const z = zoomRef.current;
+      // Translate viewport pointer to content coordinates by dividing by zoom.
+      const contentW = rect.width / z;
+      const contentH = rect.height / z;
+      const newX = Math.max(0, Math.min(contentW - NODE_W, (ev.clientX - rect.left) / z - drag.offsetX));
+      const newY = Math.max(0, Math.min(contentH - NODE_H, (ev.clientY - rect.top) / z - drag.offsetY));
       drag.nextX = newX;
       drag.nextY = newY;
       drag.moved = true;
@@ -279,6 +309,20 @@ const CreateLine = () => {
       window.removeEventListener("pointercancel", onUp);
     };
   }, [applyDragFrame]);
+
+  // ===== Wheel zoom on the canvas =====
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const onWheel = (ev: WheelEvent) => {
+      // Zoom on plain wheel inside canvas. Always prevent page scroll.
+      ev.preventDefault();
+      const delta = ev.deltaY > 0 ? -0.1 : 0.1;
+      setZoom((z) => clampZoom(parseFloat((z + delta).toFixed(2))));
+    };
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    return () => canvas.removeEventListener("wheel", onWheel as EventListener);
+  }, []);
 
   const handleCanvasClick = () => {
     setSelectedNodeId(null);
@@ -444,72 +488,85 @@ const CreateLine = () => {
 
         <div className="flex-1 flex min-h-0">
           {/* LEFT: Catalog */}
-          <aside className="w-[280px] flex-shrink-0 border-r border-border bg-card/30 flex flex-col">
-            <div className="p-3 border-b border-border space-y-2">
-              <h2 className="font-display font-semibold text-sm flex items-center gap-2">
-                <GripVertical className="h-4 w-4 text-primary" />
-                Catálogo de Máquinas
-              </h2>
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar máquina..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-7 h-8 text-xs"
-                />
-              </div>
-              <select
-                value={activeCategory}
-                onChange={(e) => setActiveCategory(e.target.value)}
-                className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
-              >
-                <option value="all">Todas as categorias</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <ScrollArea className="flex-1">
-              <div className="p-2 space-y-1.5">
-                {filteredMachines.length === 0 && (
-                  <p className="text-xs text-muted-foreground text-center py-6">
-                    Nenhuma máquina encontrada
-                  </p>
-                )}
-                {filteredMachines.map((m) => (
-                  <div
-                    key={m.id}
-                    draggable
-                    onDragStart={(e) => handleSidebarDragStart(e, m.id)}
-                    className="group cursor-grab active:cursor-grabbing rounded-md border border-border bg-card p-2.5 hover:border-primary/50 hover:bg-accent/30 transition-colors"
-                    title="Arraste para o canvas"
+          {leftOpen && (
+            <aside className="w-[280px] flex-shrink-0 border-r border-border bg-card/30 flex flex-col">
+              <div className="p-3 border-b border-border space-y-2">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-display font-semibold text-sm flex items-center gap-2">
+                    <GripVertical className="h-4 w-4 text-primary" />
+                    Catálogo de Máquinas
+                  </h2>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setLeftOpen(false)}
+                    title="Ocultar catálogo"
                   >
-                    <div className="flex items-start gap-2">
-                      <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-primary/10 text-primary">
-                        <GripVertical className="h-3.5 w-3.5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium text-foreground line-clamp-2 leading-tight">
-                          {m.name}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">
-                          {m.model}
-                        </p>
+                    <PanelLeftClose className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar máquina..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-7 h-8 text-xs"
+                  />
+                </div>
+                <select
+                  value={activeCategory}
+                  onChange={(e) => setActiveCategory(e.target.value)}
+                  className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
+                >
+                  <option value="all">Todas as categorias</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <ScrollArea className="flex-1">
+                <div className="p-2 space-y-1.5">
+                  {filteredMachines.length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-6">
+                      Nenhuma máquina encontrada
+                    </p>
+                  )}
+                  {filteredMachines.map((m) => (
+                    <div
+                      key={m.id}
+                      draggable
+                      onDragStart={(e) => handleSidebarDragStart(e, m.id)}
+                      className="group cursor-grab active:cursor-grabbing rounded-md border border-border bg-card p-2.5 hover:border-primary/50 hover:bg-accent/30 transition-colors"
+                      title="Arraste para o canvas"
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-primary/10 text-primary">
+                          <GripVertical className="h-3.5 w-3.5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-foreground line-clamp-2 leading-tight">
+                            {m.name}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">
+                            {m.model}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              </ScrollArea>
+              <div className="p-2 border-t border-border bg-muted/20">
+                <p className="text-[10px] text-muted-foreground text-center">
+                  💡 Arraste para o canvas · duplo clique abre detalhes
+                </p>
               </div>
-            </ScrollArea>
-            <div className="p-2 border-t border-border bg-muted/20">
-              <p className="text-[10px] text-muted-foreground text-center">
-                💡 Arraste para o canvas · duplo clique abre detalhes
-              </p>
-            </div>
-          </aside>
+            </aside>
+          )}
 
           {/* CENTER: Canvas */}
           <main className="flex-1 relative overflow-hidden bg-[radial-gradient(circle_at_1px_1px,hsl(var(--border))_1px,transparent_0)] [background-size:24px_24px]">
@@ -520,25 +577,121 @@ const CreateLine = () => {
               onClick={handleCanvasClick}
               className="absolute inset-0"
             >
-              {/* SVG layer for edges */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none">
-                <defs>
-                  <marker
-                    id="arrow"
-                    viewBox="0 0 10 10"
-                    refX="8"
-                    refY="5"
-                    markerWidth="6"
-                    markerHeight="6"
-                    orient="auto-start-reverse"
-                  >
-                    <path d="M 0 0 L 10 5 L 0 10 z" fill="hsl(var(--primary))" />
-                  </marker>
-                </defs>
-                {renderEdges()}
-              </svg>
+              {/* Zoom-transformed content layer */}
+              <div
+                className="absolute top-0 left-0 origin-top-left"
+                style={{
+                  transform: `scale(${zoom})`,
+                  // give the wrapper a huge logical size so nodes can sit anywhere
+                  width: "10000px",
+                  height: "10000px",
+                  transition: isDragging ? "none" : "transform 120ms ease-out",
+                }}
+              >
+                {/* SVG layer for edges */}
+                <svg className="absolute inset-0 w-full h-full pointer-events-none">
+                  <defs>
+                    <marker
+                      id="arrow"
+                      viewBox="0 0 10 10"
+                      refX="8"
+                      refY="5"
+                      markerWidth="6"
+                      markerHeight="6"
+                      orient="auto-start-reverse"
+                    >
+                      <path d="M 0 0 L 10 5 L 0 10 z" fill="hsl(var(--primary))" />
+                    </marker>
+                  </defs>
+                  {renderEdges()}
+                </svg>
 
-              {/* Empty state */}
+                {/* Nodes */}
+                {nodes.map((node) => {
+                  const machine = machineMap.get(node.machineId);
+                  if (!machine) return null;
+                  const isSelected = selectedNodeId === node.id;
+                  const isConnectingSrc = connectingFrom === node.id;
+                  const hue = hueFromId(machine.id);
+                  const isThisDragging =
+                    isDragging && draggingRef.current?.nodeId === node.id;
+                  return (
+                    <div
+                      key={node.id}
+                      id={`flow-node-${node.id}`}
+                      style={{
+                        left: 0,
+                        top: 0,
+                        width: NODE_W,
+                        height: NODE_H,
+                        transform: `translate3d(${node.x}px, ${node.y}px, 0)`,
+                        willChange: isThisDragging ? "transform" : undefined,
+                        transition: isThisDragging ? "none" : "box-shadow 150ms, border-color 150ms",
+                        touchAction: "none",
+                        zIndex: isSelected || isThisDragging ? 30 : 10,
+                      }}
+                      onPointerDown={(e) => handleNodePointerDown(e, node)}
+                      onClick={(e) => handleNodeClick(e, node.id)}
+                      onDoubleClick={(e) => handleNodeDoubleClick(e, node.machineId)}
+                      className={cn(
+                        "absolute rounded-xl border-2 bg-card shadow-lg cursor-grab active:cursor-grabbing select-none overflow-hidden",
+                        isSelected
+                          ? "border-primary shadow-[0_0_24px_-4px_hsl(var(--primary)/0.55)]"
+                          : "border-border hover:border-primary/60",
+                        isConnectingSrc && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                      )}
+                      title="Duplo clique para ver detalhes"
+                    >
+                      {/* "Photo" area — colored placeholder per machine */}
+                      <div
+                        className="relative h-[140px] w-full flex items-center justify-center"
+                        style={{
+                          background: `linear-gradient(135deg, hsl(${hue} 55% 22%) 0%, hsl(${(hue + 40) % 360} 60% 14%) 100%)`,
+                        }}
+                      >
+                        <ImageIcon className="h-10 w-10 text-white/30" />
+                        <span className="absolute top-1.5 left-1.5 text-[9px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-white/80 backdrop-blur-sm">
+                          {machine.model}
+                        </span>
+                      </div>
+
+                      {/* Name only */}
+                      <div className="px-2.5 py-2 h-[60px] flex items-center">
+                        <p className="text-[11px] font-semibold text-foreground line-clamp-2 leading-tight">
+                          {machine.name}
+                        </p>
+                      </div>
+
+                      {/* connection handle right */}
+                      <button
+                        onClick={(e) => startConnection(e, node.id)}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        title="Conectar a outra máquina"
+                        className="absolute -right-2 top-[70px] h-4 w-4 rounded-full bg-primary border-2 border-background hover:scale-125 transition-transform z-10"
+                      />
+                      {/* input handle left */}
+                      <div className="absolute -left-2 top-[70px] h-3 w-3 rounded-full bg-muted border-2 border-background" />
+
+                      {isSelected && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteNode(node.id);
+                          }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-md hover:scale-110 transition-transform z-20"
+                          title="Remover"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Empty state — kept in screen space (not zoomed) */}
               {nodes.length === 0 && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="text-center max-w-sm">
@@ -556,90 +709,6 @@ const CreateLine = () => {
                 </div>
               )}
 
-              {/* Nodes */}
-              {nodes.map((node) => {
-                const machine = machineMap.get(node.machineId);
-                if (!machine) return null;
-                const isSelected = selectedNodeId === node.id;
-                const isConnectingSrc = connectingFrom === node.id;
-                const hue = hueFromId(machine.id);
-                const isThisDragging =
-                  isDragging && draggingRef.current?.nodeId === node.id;
-                return (
-                  <div
-                    key={node.id}
-                    id={`flow-node-${node.id}`}
-                    style={{
-                      left: 0,
-                      top: 0,
-                      width: NODE_W,
-                      height: NODE_H,
-                      transform: `translate3d(${node.x}px, ${node.y}px, 0)`,
-                      willChange: isThisDragging ? "transform" : undefined,
-                      transition: isThisDragging ? "none" : "box-shadow 150ms, border-color 150ms",
-                      touchAction: "none",
-                      zIndex: isSelected || isThisDragging ? 30 : 10,
-                    }}
-                    onPointerDown={(e) => handleNodePointerDown(e, node)}
-                    onClick={(e) => handleNodeClick(e, node.id)}
-                    onDoubleClick={(e) => handleNodeDoubleClick(e, node.machineId)}
-                    className={cn(
-                      "absolute rounded-xl border-2 bg-card shadow-lg cursor-grab active:cursor-grabbing select-none overflow-hidden",
-                      isSelected
-                        ? "border-primary shadow-[0_0_24px_-4px_hsl(var(--primary)/0.55)]"
-                        : "border-border hover:border-primary/60",
-                      isConnectingSrc && "ring-2 ring-primary ring-offset-2 ring-offset-background",
-                    )}
-                    title="Duplo clique para ver detalhes"
-                  >
-                    {/* "Photo" area — colored placeholder per machine */}
-                    <div
-                      className="relative h-[140px] w-full flex items-center justify-center"
-                      style={{
-                        background: `linear-gradient(135deg, hsl(${hue} 55% 22%) 0%, hsl(${(hue + 40) % 360} 60% 14%) 100%)`,
-                      }}
-                    >
-                      <ImageIcon className="h-10 w-10 text-white/30" />
-                      <span className="absolute top-1.5 left-1.5 text-[9px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-white/80 backdrop-blur-sm">
-                        {machine.model}
-                      </span>
-                    </div>
-
-                    {/* Name only */}
-                    <div className="px-2.5 py-2 h-[60px] flex items-center">
-                      <p className="text-[11px] font-semibold text-foreground line-clamp-2 leading-tight">
-                        {machine.name}
-                      </p>
-                    </div>
-
-                    {/* connection handle right */}
-                    <button
-                      onClick={(e) => startConnection(e, node.id)}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      title="Conectar a outra máquina"
-                      className="absolute -right-2 top-[70px] h-4 w-4 rounded-full bg-primary border-2 border-background hover:scale-125 transition-transform z-10"
-                    />
-                    {/* input handle left */}
-                    <div className="absolute -left-2 top-[70px] h-3 w-3 rounded-full bg-muted border-2 border-background" />
-
-                    {isSelected && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteNode(node.id);
-                        }}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-md hover:scale-110 transition-transform z-20"
-                        title="Remover"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-
               {connectingFrom && (
                 <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 pointer-events-none z-40">
                   <Link2 className="h-3 w-3" />
@@ -647,9 +716,77 @@ const CreateLine = () => {
                 </div>
               )}
             </div>
+
+            {/* Floating: reopen left panel */}
+            {!leftOpen && (
+              <Button
+                variant="secondary"
+                size="icon"
+                onClick={() => setLeftOpen(true)}
+                title="Mostrar catálogo"
+                className="absolute top-3 left-3 z-40 h-9 w-9 shadow-lg"
+              >
+                <PanelLeftOpen className="h-4 w-4" />
+              </Button>
+            )}
+
+            {/* Floating: reopen right panel */}
+            {!rightOpen && (
+              <Button
+                variant="secondary"
+                size="icon"
+                onClick={() => setRightOpen(true)}
+                title="Mostrar chat do Fagner"
+                className="absolute top-3 right-3 z-40 h-9 w-9 shadow-lg"
+              >
+                <PanelRightOpen className="h-4 w-4" />
+              </Button>
+            )}
+
+            {/* Floating: zoom controls */}
+            <div className="absolute bottom-4 right-4 z-40 flex flex-col items-center gap-1 rounded-lg border border-border bg-card/95 backdrop-blur shadow-lg p-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={zoomIn}
+                disabled={zoom >= ZOOM_MAX}
+                title="Aumentar zoom"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+              <button
+                onClick={zoomReset}
+                className="text-[10px] font-mono text-muted-foreground hover:text-foreground px-1 py-0.5 rounded"
+                title="Restaurar zoom (100%)"
+              >
+                {Math.round(zoom * 100)}%
+              </button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={zoomOut}
+                disabled={zoom <= ZOOM_MIN}
+                title="Diminuir zoom"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <div className="h-px w-6 bg-border my-0.5" />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={zoomReset}
+                title="Resetar zoom"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </Button>
+            </div>
           </main>
 
           {/* RIGHT: Chat with Fagner */}
+          {rightOpen && (
           <aside className="w-[340px] flex-shrink-0 border-l border-border bg-card/30 flex flex-col">
             <div className="p-3 border-b border-border flex items-center gap-2">
               <div className="relative">
@@ -667,6 +804,15 @@ const CreateLine = () => {
                   Especialista em linhas industriais
                 </p>
               </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setRightOpen(false)}
+                title="Ocultar chat"
+              >
+                <PanelRightClose className="h-4 w-4" />
+              </Button>
             </div>
 
             <ScrollArea className="flex-1">
@@ -773,6 +919,7 @@ const CreateLine = () => {
               </div>
             </div>
           </aside>
+          )}
         </div>
       </div>
 
