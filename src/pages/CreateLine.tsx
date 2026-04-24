@@ -81,21 +81,66 @@ const CreateLine = () => {
   // modal
   const [openMachine, setOpenMachine] = useState<LineMachine | null>(null);
 
-  // zoom + panels
+  // zoom + panels + pan
   const ZOOM_MIN = 0.4;
   const ZOOM_MAX = 2;
   const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
   const zoomRef = useRef(1);
+  const panRef = useRef({ x: 0, y: 0 });
   useEffect(() => {
     zoomRef.current = zoom;
   }, [zoom]);
+  useEffect(() => {
+    panRef.current = pan;
+  }, [pan]);
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
 
+  // pan mode (toggled by Space key or dedicated button); spaceHeld tracks
+  // momentary activation while the key is held.
+  const [panMode, setPanMode] = useState(false);
+  const [spaceHeld, setSpaceHeld] = useState(false);
+  const isPanActive = panMode || spaceHeld;
+  const isPanActiveRef = useRef(false);
+  useEffect(() => {
+    isPanActiveRef.current = isPanActive;
+  }, [isPanActive]);
+
   const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
-  const zoomIn = () => setZoom((z) => clampZoom(parseFloat((z + 0.1).toFixed(2))));
-  const zoomOut = () => setZoom((z) => clampZoom(parseFloat((z - 0.1).toFixed(2))));
-  const zoomReset = () => setZoom(1);
+
+  // Zoom around an anchor point given in canvas-local pixel coordinates.
+  // Keeps the world point under the anchor stationary on screen.
+  const zoomAt = useCallback((nextZoomRaw: number, anchorX: number, anchorY: number) => {
+    const nextZoom = clampZoom(nextZoomRaw);
+    const z = zoomRef.current;
+    if (nextZoom === z) return;
+    const p = panRef.current;
+    // world point under cursor before zoom
+    const worldX = (anchorX - p.x) / z;
+    const worldY = (anchorY - p.y) / z;
+    // new pan so the same world point stays under the cursor
+    const newPanX = anchorX - worldX * nextZoom;
+    const newPanY = anchorY - worldY * nextZoom;
+    setZoom(nextZoom);
+    setPan({ x: newPanX, y: newPanY });
+  }, []);
+
+  // Centered zoom helpers (icon buttons): anchor is the canvas center.
+  const zoomCenterDelta = (delta: number) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) {
+      setZoom((z) => clampZoom(parseFloat((z + delta).toFixed(2))));
+      return;
+    }
+    zoomAt(parseFloat((zoomRef.current + delta).toFixed(2)), rect.width / 2, rect.height / 2);
+  };
+  const zoomIn = () => zoomCenterDelta(0.1);
+  const zoomOut = () => zoomCenterDelta(-0.1);
+  const zoomReset = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
 
   // ---- Smooth drag with refs + rAF (no React state per mousemove) ----
   const draggingRef = useRef<{
