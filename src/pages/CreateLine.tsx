@@ -488,72 +488,85 @@ const CreateLine = () => {
 
         <div className="flex-1 flex min-h-0">
           {/* LEFT: Catalog */}
-          <aside className="w-[280px] flex-shrink-0 border-r border-border bg-card/30 flex flex-col">
-            <div className="p-3 border-b border-border space-y-2">
-              <h2 className="font-display font-semibold text-sm flex items-center gap-2">
-                <GripVertical className="h-4 w-4 text-primary" />
-                Catálogo de Máquinas
-              </h2>
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar máquina..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-7 h-8 text-xs"
-                />
-              </div>
-              <select
-                value={activeCategory}
-                onChange={(e) => setActiveCategory(e.target.value)}
-                className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
-              >
-                <option value="all">Todas as categorias</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <ScrollArea className="flex-1">
-              <div className="p-2 space-y-1.5">
-                {filteredMachines.length === 0 && (
-                  <p className="text-xs text-muted-foreground text-center py-6">
-                    Nenhuma máquina encontrada
-                  </p>
-                )}
-                {filteredMachines.map((m) => (
-                  <div
-                    key={m.id}
-                    draggable
-                    onDragStart={(e) => handleSidebarDragStart(e, m.id)}
-                    className="group cursor-grab active:cursor-grabbing rounded-md border border-border bg-card p-2.5 hover:border-primary/50 hover:bg-accent/30 transition-colors"
-                    title="Arraste para o canvas"
+          {leftOpen && (
+            <aside className="w-[280px] flex-shrink-0 border-r border-border bg-card/30 flex flex-col">
+              <div className="p-3 border-b border-border space-y-2">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-display font-semibold text-sm flex items-center gap-2">
+                    <GripVertical className="h-4 w-4 text-primary" />
+                    Catálogo de Máquinas
+                  </h2>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setLeftOpen(false)}
+                    title="Ocultar catálogo"
                   >
-                    <div className="flex items-start gap-2">
-                      <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-primary/10 text-primary">
-                        <GripVertical className="h-3.5 w-3.5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium text-foreground line-clamp-2 leading-tight">
-                          {m.name}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">
-                          {m.model}
-                        </p>
+                    <PanelLeftClose className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar máquina..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-7 h-8 text-xs"
+                  />
+                </div>
+                <select
+                  value={activeCategory}
+                  onChange={(e) => setActiveCategory(e.target.value)}
+                  className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
+                >
+                  <option value="all">Todas as categorias</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <ScrollArea className="flex-1">
+                <div className="p-2 space-y-1.5">
+                  {filteredMachines.length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-6">
+                      Nenhuma máquina encontrada
+                    </p>
+                  )}
+                  {filteredMachines.map((m) => (
+                    <div
+                      key={m.id}
+                      draggable
+                      onDragStart={(e) => handleSidebarDragStart(e, m.id)}
+                      className="group cursor-grab active:cursor-grabbing rounded-md border border-border bg-card p-2.5 hover:border-primary/50 hover:bg-accent/30 transition-colors"
+                      title="Arraste para o canvas"
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded bg-primary/10 text-primary">
+                          <GripVertical className="h-3.5 w-3.5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-foreground line-clamp-2 leading-tight">
+                            {m.name}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">
+                            {m.model}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              </ScrollArea>
+              <div className="p-2 border-t border-border bg-muted/20">
+                <p className="text-[10px] text-muted-foreground text-center">
+                  💡 Arraste para o canvas · duplo clique abre detalhes
+                </p>
               </div>
-            </ScrollArea>
-            <div className="p-2 border-t border-border bg-muted/20">
-              <p className="text-[10px] text-muted-foreground text-center">
-                💡 Arraste para o canvas · duplo clique abre detalhes
-              </p>
-            </div>
-          </aside>
+            </aside>
+          )}
 
           {/* CENTER: Canvas */}
           <main className="flex-1 relative overflow-hidden bg-[radial-gradient(circle_at_1px_1px,hsl(var(--border))_1px,transparent_0)] [background-size:24px_24px]">
