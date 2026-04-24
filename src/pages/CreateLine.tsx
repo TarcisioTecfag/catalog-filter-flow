@@ -222,8 +222,9 @@ const CreateLine = () => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     const z = zoomRef.current;
-    const x = (e.clientX - rect.left) / z - NODE_W / 2;
-    const y = (e.clientY - rect.top) / z - NODE_H / 2;
+    const p = panRef.current;
+    const x = (e.clientX - rect.left - p.x) / z - NODE_W / 2;
+    const y = (e.clientY - rect.top - p.y) / z - NODE_H / 2;
     const newNode: FlowNode = {
       id: `n_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       machineId,
