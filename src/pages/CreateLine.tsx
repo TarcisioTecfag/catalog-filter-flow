@@ -286,20 +286,22 @@ const CreateLine = () => {
 
   const handleNodePointerDown = (e: React.PointerEvent<HTMLDivElement>, node: FlowNode) => {
     if (connectingFrom) return;
+    if (isPanActiveRef.current) return; // pan mode owns canvas drags
     if (e.button !== 0) return;
     e.stopPropagation();
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     const z = zoomRef.current;
+    const p = panRef.current;
     // Pre-compute which edges touch this node so we don't filter on every frame.
     const affectedEdges = edges
       .filter((ed) => ed.source === node.id || ed.target === node.id)
       .map((ed) => ({ edgeId: ed.id, sourceId: ed.source, targetId: ed.target }));
     draggingRef.current = {
       nodeId: node.id,
-      // offsets are in content (unzoomed) coordinates
-      offsetX: (e.clientX - rect.left) / z - node.x,
-      offsetY: (e.clientY - rect.top) / z - node.y,
+      // offsets are in content (unzoomed, unpanned) coordinates
+      offsetX: (e.clientX - rect.left - p.x) / z - node.x,
+      offsetY: (e.clientY - rect.top - p.y) / z - node.y,
       rafId: null,
       nextX: node.x,
       nextY: node.y,
@@ -318,11 +320,12 @@ const CreateLine = () => {
       const rect = canvasRef.current?.getBoundingClientRect();
       if (!rect) return;
       const z = zoomRef.current;
-      // Translate viewport pointer to content coordinates by dividing by zoom.
-      const contentW = rect.width / z;
-      const contentH = rect.height / z;
-      const newX = Math.max(0, Math.min(contentW - NODE_W, (ev.clientX - rect.left) / z - drag.offsetX));
-      const newY = Math.max(0, Math.min(contentH - NODE_H, (ev.clientY - rect.top) / z - drag.offsetY));
+      const p = panRef.current;
+      // Translate viewport pointer to content coordinates: subtract pan, divide by zoom.
+      // No bounds clamping vs viewport — content can extend beyond visible area
+      // (the user can pan to reach it). Just clamp at zero on the top/left.
+      const newX = Math.max(0, (ev.clientX - rect.left - p.x) / z - drag.offsetX);
+      const newY = Math.max(0, (ev.clientY - rect.top - p.y) / z - drag.offsetY);
       drag.nextX = newX;
       drag.nextY = newY;
       drag.moved = true;
