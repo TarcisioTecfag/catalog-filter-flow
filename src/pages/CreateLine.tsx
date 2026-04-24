@@ -894,15 +894,32 @@ const CreateLine = () => {
               </Button>
               <div className="h-px w-6 bg-border my-0.5" />
               <Button
+                variant={panMode ? "default" : "ghost"}
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setPanMode((v) => !v)}
+                title="Mover tela (Espaço)"
+              >
+                <Hand className="h-4 w-4" />
+              </Button>
+              <Button
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
                 onClick={zoomReset}
-                title="Resetar zoom"
+                title="Resetar zoom e posição"
               >
                 <Maximize2 className="h-4 w-4" />
               </Button>
             </div>
+
+            {/* Pan-mode hint */}
+            {isPanActive && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 bg-primary text-primary-foreground text-xs px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 pointer-events-none">
+                <Hand className="h-3 w-3" />
+                Modo mover ativo {spaceHeld ? "(segurando Espaço)" : "— clique no botão para sair"}
+              </div>
+            )}
           </main>
 
           {/* RIGHT: Chat with Fagner */}
