@@ -23,6 +23,7 @@ import {
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
+  Hand,
 } from "lucide-react";
 import PageTransition from "@/components/PageTransition";
 import { Input } from "@/components/ui/input";
@@ -81,21 +82,66 @@ const CreateLine = () => {
   // modal
   const [openMachine, setOpenMachine] = useState<LineMachine | null>(null);
 
-  // zoom + panels
+  // zoom + panels + pan
   const ZOOM_MIN = 0.4;
   const ZOOM_MAX = 2;
   const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
   const zoomRef = useRef(1);
+  const panRef = useRef({ x: 0, y: 0 });
   useEffect(() => {
     zoomRef.current = zoom;
   }, [zoom]);
+  useEffect(() => {
+    panRef.current = pan;
+  }, [pan]);
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
 
+  // pan mode (toggled by Space key or dedicated button); spaceHeld tracks
+  // momentary activation while the key is held.
+  const [panMode, setPanMode] = useState(false);
+  const [spaceHeld, setSpaceHeld] = useState(false);
+  const isPanActive = panMode || spaceHeld;
+  const isPanActiveRef = useRef(false);
+  useEffect(() => {
+    isPanActiveRef.current = isPanActive;
+  }, [isPanActive]);
+
   const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
-  const zoomIn = () => setZoom((z) => clampZoom(parseFloat((z + 0.1).toFixed(2))));
-  const zoomOut = () => setZoom((z) => clampZoom(parseFloat((z - 0.1).toFixed(2))));
-  const zoomReset = () => setZoom(1);
+
+  // Zoom around an anchor point given in canvas-local pixel coordinates.
+  // Keeps the world point under the anchor stationary on screen.
+  const zoomAt = useCallback((nextZoomRaw: number, anchorX: number, anchorY: number) => {
+    const nextZoom = clampZoom(nextZoomRaw);
+    const z = zoomRef.current;
+    if (nextZoom === z) return;
+    const p = panRef.current;
+    // world point under cursor before zoom
+    const worldX = (anchorX - p.x) / z;
+    const worldY = (anchorY - p.y) / z;
+    // new pan so the same world point stays under the cursor
+    const newPanX = anchorX - worldX * nextZoom;
+    const newPanY = anchorY - worldY * nextZoom;
+    setZoom(nextZoom);
+    setPan({ x: newPanX, y: newPanY });
+  }, []);
+
+  // Centered zoom helpers (icon buttons): anchor is the canvas center.
+  const zoomCenterDelta = (delta: number) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) {
+      setZoom((z) => clampZoom(parseFloat((z + delta).toFixed(2))));
+      return;
+    }
+    zoomAt(parseFloat((zoomRef.current + delta).toFixed(2)), rect.width / 2, rect.height / 2);
+  };
+  const zoomIn = () => zoomCenterDelta(0.1);
+  const zoomOut = () => zoomCenterDelta(-0.1);
+  const zoomReset = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
 
   // ---- Smooth drag with refs + rAF (no React state per mousemove) ----
   const draggingRef = useRef<{
@@ -177,8 +223,9 @@ const CreateLine = () => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     const z = zoomRef.current;
-    const x = (e.clientX - rect.left) / z - NODE_W / 2;
-    const y = (e.clientY - rect.top) / z - NODE_H / 2;
+    const p = panRef.current;
+    const x = (e.clientX - rect.left - p.x) / z - NODE_W / 2;
+    const y = (e.clientY - rect.top - p.y) / z - NODE_H / 2;
     const newNode: FlowNode = {
       id: `n_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       machineId,
@@ -240,20 +287,22 @@ const CreateLine = () => {
 
   const handleNodePointerDown = (e: React.PointerEvent<HTMLDivElement>, node: FlowNode) => {
     if (connectingFrom) return;
+    if (isPanActiveRef.current) return; // pan mode owns canvas drags
     if (e.button !== 0) return;
     e.stopPropagation();
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     const z = zoomRef.current;
+    const p = panRef.current;
     // Pre-compute which edges touch this node so we don't filter on every frame.
     const affectedEdges = edges
       .filter((ed) => ed.source === node.id || ed.target === node.id)
       .map((ed) => ({ edgeId: ed.id, sourceId: ed.source, targetId: ed.target }));
     draggingRef.current = {
       nodeId: node.id,
-      // offsets are in content (unzoomed) coordinates
-      offsetX: (e.clientX - rect.left) / z - node.x,
-      offsetY: (e.clientY - rect.top) / z - node.y,
+      // offsets are in content (unzoomed, unpanned) coordinates
+      offsetX: (e.clientX - rect.left - p.x) / z - node.x,
+      offsetY: (e.clientY - rect.top - p.y) / z - node.y,
       rafId: null,
       nextX: node.x,
       nextY: node.y,
@@ -272,11 +321,12 @@ const CreateLine = () => {
       const rect = canvasRef.current?.getBoundingClientRect();
       if (!rect) return;
       const z = zoomRef.current;
-      // Translate viewport pointer to content coordinates by dividing by zoom.
-      const contentW = rect.width / z;
-      const contentH = rect.height / z;
-      const newX = Math.max(0, Math.min(contentW - NODE_W, (ev.clientX - rect.left) / z - drag.offsetX));
-      const newY = Math.max(0, Math.min(contentH - NODE_H, (ev.clientY - rect.top) / z - drag.offsetY));
+      const p = panRef.current;
+      // Translate viewport pointer to content coordinates: subtract pan, divide by zoom.
+      // No bounds clamping vs viewport — content can extend beyond visible area
+      // (the user can pan to reach it). Just clamp at zero on the top/left.
+      const newX = Math.max(0, (ev.clientX - rect.left - p.x) / z - drag.offsetX);
+      const newY = Math.max(0, (ev.clientY - rect.top - p.y) / z - drag.offsetY);
       drag.nextX = newX;
       drag.nextY = newY;
       drag.moved = true;
@@ -310,19 +360,83 @@ const CreateLine = () => {
     };
   }, [applyDragFrame]);
 
-  // ===== Wheel zoom on the canvas =====
+  // ===== Wheel zoom centered on cursor =====
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const onWheel = (ev: WheelEvent) => {
-      // Zoom on plain wheel inside canvas. Always prevent page scroll.
       ev.preventDefault();
-      const delta = ev.deltaY > 0 ? -0.1 : 0.1;
-      setZoom((z) => clampZoom(parseFloat((z + delta).toFixed(2))));
+      const rect = canvas.getBoundingClientRect();
+      const ax = ev.clientX - rect.left;
+      const ay = ev.clientY - rect.top;
+      // Smooth-ish multiplicative step.
+      const factor = ev.deltaY > 0 ? 0.9 : 1.1;
+      const next = parseFloat((zoomRef.current * factor).toFixed(3));
+      zoomAt(next, ax, ay);
     };
     canvas.addEventListener("wheel", onWheel, { passive: false });
     return () => canvas.removeEventListener("wheel", onWheel as EventListener);
+  }, [zoomAt]);
+
+  // ===== Space key toggles temporary pan mode while held =====
+  useEffect(() => {
+    const onKeyDown = (ev: KeyboardEvent) => {
+      if (ev.code !== "Space") return;
+      const t = ev.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      ev.preventDefault();
+      setSpaceHeld(true);
+    };
+    const onKeyUp = (ev: KeyboardEvent) => {
+      if (ev.code !== "Space") return;
+      setSpaceHeld(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
   }, []);
+
+  // ===== Pan drag (when pan mode is active or with middle mouse) =====
+  const panDragRef = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(null);
+  const handleCanvasPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const isMiddle = e.button === 1;
+    if (!isPanActiveRef.current && !isMiddle) return;
+    if (e.button !== 0 && !isMiddle) return;
+    e.preventDefault();
+    panDragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      baseX: panRef.current.x,
+      baseY: panRef.current.y,
+    };
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+  };
+
+  useEffect(() => {
+    const onMove = (ev: PointerEvent) => {
+      const drag = panDragRef.current;
+      if (!drag) return;
+      setPan({
+        x: drag.baseX + (ev.clientX - drag.startX),
+        y: drag.baseY + (ev.clientY - drag.startY),
+      });
+    };
+    const onUp = () => {
+      panDragRef.current = null;
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, []);
+
 
   const handleCanvasClick = () => {
     setSelectedNodeId(null);
@@ -574,18 +688,24 @@ const CreateLine = () => {
               ref={canvasRef}
               onDragOver={handleCanvasDragOver}
               onDrop={handleCanvasDrop}
+              onPointerDown={handleCanvasPointerDown}
               onClick={handleCanvasClick}
-              className="absolute inset-0"
+              className={cn(
+                "absolute inset-0",
+                isPanActive && (panDragRef.current ? "cursor-grabbing" : "cursor-grab"),
+              )}
+              style={{ touchAction: isPanActive ? "none" : undefined }}
             >
-              {/* Zoom-transformed content layer */}
+              {/* Zoom + pan content layer */}
               <div
                 className="absolute top-0 left-0 origin-top-left"
                 style={{
-                  transform: `scale(${zoom})`,
+                  transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
                   // give the wrapper a huge logical size so nodes can sit anywhere
                   width: "10000px",
                   height: "10000px",
-                  transition: isDragging ? "none" : "transform 120ms ease-out",
+                  transition: isDragging || panDragRef.current ? "none" : "transform 120ms ease-out",
+                  pointerEvents: isPanActive ? "none" : undefined,
                 }}
               >
                 {/* SVG layer for edges */}
@@ -774,15 +894,32 @@ const CreateLine = () => {
               </Button>
               <div className="h-px w-6 bg-border my-0.5" />
               <Button
+                variant={panMode ? "default" : "ghost"}
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setPanMode((v) => !v)}
+                title="Mover tela (Espaço)"
+              >
+                <Hand className="h-4 w-4" />
+              </Button>
+              <Button
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
                 onClick={zoomReset}
-                title="Resetar zoom"
+                title="Resetar zoom e posição"
               >
                 <Maximize2 className="h-4 w-4" />
               </Button>
             </div>
+
+            {/* Pan-mode hint */}
+            {isPanActive && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 bg-primary text-primary-foreground text-xs px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 pointer-events-none">
+                <Hand className="h-3 w-3" />
+                Modo mover ativo {spaceHeld ? "(segurando Espaço)" : "— clique no botão para sair"}
+              </div>
+            )}
           </main>
 
           {/* RIGHT: Chat with Fagner */}
