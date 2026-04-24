@@ -399,8 +399,29 @@ const CreateLine = () => {
     };
   }, []);
 
-  // ===== Pan drag (when pan mode is active or with middle mouse) =====
-  const panDragRef = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(null);
+  // ===== Pan drag (rAF-driven, direct DOM transform) =====
+  const panDragRef = useRef<{
+    startX: number;
+    startY: number;
+    baseX: number;
+    baseY: number;
+    nextX: number;
+    nextY: number;
+    rafId: number | null;
+  } | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
+
+  const applyPanFrame = useCallback(() => {
+    const drag = panDragRef.current;
+    if (!drag) return;
+    drag.rafId = null;
+    panRef.current = { x: drag.nextX, y: drag.nextY };
+    const wrapper = document.getElementById("flow-canvas-wrapper");
+    if (wrapper) {
+      wrapper.style.transform = `translate3d(${drag.nextX}px, ${drag.nextY}px, 0) scale(${zoomRef.current})`;
+    }
+  }, []);
+
   const handleCanvasPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const isMiddle = e.button === 1;
     if (!isPanActiveRef.current && !isMiddle) return;
@@ -411,7 +432,11 @@ const CreateLine = () => {
       startY: e.clientY,
       baseX: panRef.current.x,
       baseY: panRef.current.y,
+      nextX: panRef.current.x,
+      nextY: panRef.current.y,
+      rafId: null,
     };
+    setIsPanning(true);
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
   };
 
@@ -419,13 +444,22 @@ const CreateLine = () => {
     const onMove = (ev: PointerEvent) => {
       const drag = panDragRef.current;
       if (!drag) return;
-      setPan({
-        x: drag.baseX + (ev.clientX - drag.startX),
-        y: drag.baseY + (ev.clientY - drag.startY),
-      });
+      drag.nextX = drag.baseX + (ev.clientX - drag.startX);
+      drag.nextY = drag.baseY + (ev.clientY - drag.startY);
+      if (drag.rafId == null) {
+        drag.rafId = requestAnimationFrame(applyPanFrame);
+      }
     };
     const onUp = () => {
+      const drag = panDragRef.current;
+      if (!drag) return;
+      if (drag.rafId != null) cancelAnimationFrame(drag.rafId);
+      const finalX = drag.nextX;
+      const finalY = drag.nextY;
       panDragRef.current = null;
+      setIsPanning(false);
+      // Commit final pan to React state — wrapper already shows these coords.
+      setPan({ x: finalX, y: finalY });
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
@@ -435,7 +469,7 @@ const CreateLine = () => {
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
     };
-  }, []);
+  }, [applyPanFrame]);
 
 
   const handleCanvasClick = () => {
@@ -692,19 +726,20 @@ const CreateLine = () => {
               onClick={handleCanvasClick}
               className={cn(
                 "absolute inset-0",
-                isPanActive && (panDragRef.current ? "cursor-grabbing" : "cursor-grab"),
+                isPanActive && (isPanning ? "cursor-grabbing" : "cursor-grab"),
               )}
               style={{ touchAction: isPanActive ? "none" : undefined }}
             >
               {/* Zoom + pan content layer */}
               <div
+                id="flow-canvas-wrapper"
                 className="absolute top-0 left-0 origin-top-left"
                 style={{
                   transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
-                  // give the wrapper a huge logical size so nodes can sit anywhere
                   width: "10000px",
                   height: "10000px",
-                  transition: isDragging || panDragRef.current ? "none" : "transform 120ms ease-out",
+                  transition: isDragging || isPanning ? "none" : "transform 120ms ease-out",
+                  willChange: isPanning || isDragging ? "transform" : undefined,
                   pointerEvents: isPanActive ? "none" : undefined,
                 }}
               >
