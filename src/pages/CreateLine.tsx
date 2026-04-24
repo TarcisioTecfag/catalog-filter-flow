@@ -355,19 +355,83 @@ const CreateLine = () => {
     };
   }, [applyDragFrame]);
 
-  // ===== Wheel zoom on the canvas =====
+  // ===== Wheel zoom centered on cursor =====
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const onWheel = (ev: WheelEvent) => {
-      // Zoom on plain wheel inside canvas. Always prevent page scroll.
       ev.preventDefault();
-      const delta = ev.deltaY > 0 ? -0.1 : 0.1;
-      setZoom((z) => clampZoom(parseFloat((z + delta).toFixed(2))));
+      const rect = canvas.getBoundingClientRect();
+      const ax = ev.clientX - rect.left;
+      const ay = ev.clientY - rect.top;
+      // Smooth-ish multiplicative step.
+      const factor = ev.deltaY > 0 ? 0.9 : 1.1;
+      const next = parseFloat((zoomRef.current * factor).toFixed(3));
+      zoomAt(next, ax, ay);
     };
     canvas.addEventListener("wheel", onWheel, { passive: false });
     return () => canvas.removeEventListener("wheel", onWheel as EventListener);
+  }, [zoomAt]);
+
+  // ===== Space key toggles temporary pan mode while held =====
+  useEffect(() => {
+    const onKeyDown = (ev: KeyboardEvent) => {
+      if (ev.code !== "Space") return;
+      const t = ev.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      ev.preventDefault();
+      setSpaceHeld(true);
+    };
+    const onKeyUp = (ev: KeyboardEvent) => {
+      if (ev.code !== "Space") return;
+      setSpaceHeld(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
   }, []);
+
+  // ===== Pan drag (when pan mode is active or with middle mouse) =====
+  const panDragRef = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(null);
+  const handleCanvasPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const isMiddle = e.button === 1;
+    if (!isPanActiveRef.current && !isMiddle) return;
+    if (e.button !== 0 && !isMiddle) return;
+    e.preventDefault();
+    panDragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      baseX: panRef.current.x,
+      baseY: panRef.current.y,
+    };
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+  };
+
+  useEffect(() => {
+    const onMove = (ev: PointerEvent) => {
+      const drag = panDragRef.current;
+      if (!drag) return;
+      setPan({
+        x: drag.baseX + (ev.clientX - drag.startX),
+        y: drag.baseY + (ev.clientY - drag.startY),
+      });
+    };
+    const onUp = () => {
+      panDragRef.current = null;
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, []);
+
 
   const handleCanvasClick = () => {
     setSelectedNodeId(null);
