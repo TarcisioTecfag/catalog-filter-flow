@@ -726,7 +726,7 @@ const CreateLine = () => {
               onClick={handleCanvasClick}
               className={cn(
                 "absolute inset-0",
-                isPanActive && (panDragRef.current ? "cursor-grabbing" : "cursor-grab"),
+                isPanActive && (isPanning ? "cursor-grabbing" : "cursor-grab"),
               )}
               style={{ touchAction: isPanActive ? "none" : undefined }}
             >
