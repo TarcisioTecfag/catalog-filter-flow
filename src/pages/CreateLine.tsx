@@ -81,6 +81,22 @@ const CreateLine = () => {
   // modal
   const [openMachine, setOpenMachine] = useState<LineMachine | null>(null);
 
+  // zoom + panels
+  const ZOOM_MIN = 0.4;
+  const ZOOM_MAX = 2;
+  const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(1);
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(true);
+
+  const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
+  const zoomIn = () => setZoom((z) => clampZoom(parseFloat((z + 0.1).toFixed(2))));
+  const zoomOut = () => setZoom((z) => clampZoom(parseFloat((z - 0.1).toFixed(2))));
+  const zoomReset = () => setZoom(1);
+
   // ---- Smooth drag with refs + rAF (no React state per mousemove) ----
   const draggingRef = useRef<{
     nodeId: string;
