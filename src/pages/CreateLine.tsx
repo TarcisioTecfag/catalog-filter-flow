@@ -577,25 +577,121 @@ const CreateLine = () => {
               onClick={handleCanvasClick}
               className="absolute inset-0"
             >
-              {/* SVG layer for edges */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none">
-                <defs>
-                  <marker
-                    id="arrow"
-                    viewBox="0 0 10 10"
-                    refX="8"
-                    refY="5"
-                    markerWidth="6"
-                    markerHeight="6"
-                    orient="auto-start-reverse"
-                  >
-                    <path d="M 0 0 L 10 5 L 0 10 z" fill="hsl(var(--primary))" />
-                  </marker>
-                </defs>
-                {renderEdges()}
-              </svg>
+              {/* Zoom-transformed content layer */}
+              <div
+                className="absolute top-0 left-0 origin-top-left"
+                style={{
+                  transform: `scale(${zoom})`,
+                  // give the wrapper a huge logical size so nodes can sit anywhere
+                  width: "10000px",
+                  height: "10000px",
+                  transition: isDragging ? "none" : "transform 120ms ease-out",
+                }}
+              >
+                {/* SVG layer for edges */}
+                <svg className="absolute inset-0 w-full h-full pointer-events-none">
+                  <defs>
+                    <marker
+                      id="arrow"
+                      viewBox="0 0 10 10"
+                      refX="8"
+                      refY="5"
+                      markerWidth="6"
+                      markerHeight="6"
+                      orient="auto-start-reverse"
+                    >
+                      <path d="M 0 0 L 10 5 L 0 10 z" fill="hsl(var(--primary))" />
+                    </marker>
+                  </defs>
+                  {renderEdges()}
+                </svg>
 
-              {/* Empty state */}
+                {/* Nodes */}
+                {nodes.map((node) => {
+                  const machine = machineMap.get(node.machineId);
+                  if (!machine) return null;
+                  const isSelected = selectedNodeId === node.id;
+                  const isConnectingSrc = connectingFrom === node.id;
+                  const hue = hueFromId(machine.id);
+                  const isThisDragging =
+                    isDragging && draggingRef.current?.nodeId === node.id;
+                  return (
+                    <div
+                      key={node.id}
+                      id={`flow-node-${node.id}`}
+                      style={{
+                        left: 0,
+                        top: 0,
+                        width: NODE_W,
+                        height: NODE_H,
+                        transform: `translate3d(${node.x}px, ${node.y}px, 0)`,
+                        willChange: isThisDragging ? "transform" : undefined,
+                        transition: isThisDragging ? "none" : "box-shadow 150ms, border-color 150ms",
+                        touchAction: "none",
+                        zIndex: isSelected || isThisDragging ? 30 : 10,
+                      }}
+                      onPointerDown={(e) => handleNodePointerDown(e, node)}
+                      onClick={(e) => handleNodeClick(e, node.id)}
+                      onDoubleClick={(e) => handleNodeDoubleClick(e, node.machineId)}
+                      className={cn(
+                        "absolute rounded-xl border-2 bg-card shadow-lg cursor-grab active:cursor-grabbing select-none overflow-hidden",
+                        isSelected
+                          ? "border-primary shadow-[0_0_24px_-4px_hsl(var(--primary)/0.55)]"
+                          : "border-border hover:border-primary/60",
+                        isConnectingSrc && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                      )}
+                      title="Duplo clique para ver detalhes"
+                    >
+                      {/* "Photo" area — colored placeholder per machine */}
+                      <div
+                        className="relative h-[140px] w-full flex items-center justify-center"
+                        style={{
+                          background: `linear-gradient(135deg, hsl(${hue} 55% 22%) 0%, hsl(${(hue + 40) % 360} 60% 14%) 100%)`,
+                        }}
+                      >
+                        <ImageIcon className="h-10 w-10 text-white/30" />
+                        <span className="absolute top-1.5 left-1.5 text-[9px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-white/80 backdrop-blur-sm">
+                          {machine.model}
+                        </span>
+                      </div>
+
+                      {/* Name only */}
+                      <div className="px-2.5 py-2 h-[60px] flex items-center">
+                        <p className="text-[11px] font-semibold text-foreground line-clamp-2 leading-tight">
+                          {machine.name}
+                        </p>
+                      </div>
+
+                      {/* connection handle right */}
+                      <button
+                        onClick={(e) => startConnection(e, node.id)}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        title="Conectar a outra máquina"
+                        className="absolute -right-2 top-[70px] h-4 w-4 rounded-full bg-primary border-2 border-background hover:scale-125 transition-transform z-10"
+                      />
+                      {/* input handle left */}
+                      <div className="absolute -left-2 top-[70px] h-3 w-3 rounded-full bg-muted border-2 border-background" />
+
+                      {isSelected && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteNode(node.id);
+                          }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-md hover:scale-110 transition-transform z-20"
+                          title="Remover"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Empty state — kept in screen space (not zoomed) */}
               {nodes.length === 0 && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="text-center max-w-sm">
@@ -613,96 +709,79 @@ const CreateLine = () => {
                 </div>
               )}
 
-              {/* Nodes */}
-              {nodes.map((node) => {
-                const machine = machineMap.get(node.machineId);
-                if (!machine) return null;
-                const isSelected = selectedNodeId === node.id;
-                const isConnectingSrc = connectingFrom === node.id;
-                const hue = hueFromId(machine.id);
-                const isThisDragging =
-                  isDragging && draggingRef.current?.nodeId === node.id;
-                return (
-                  <div
-                    key={node.id}
-                    id={`flow-node-${node.id}`}
-                    style={{
-                      left: 0,
-                      top: 0,
-                      width: NODE_W,
-                      height: NODE_H,
-                      transform: `translate3d(${node.x}px, ${node.y}px, 0)`,
-                      willChange: isThisDragging ? "transform" : undefined,
-                      transition: isThisDragging ? "none" : "box-shadow 150ms, border-color 150ms",
-                      touchAction: "none",
-                      zIndex: isSelected || isThisDragging ? 30 : 10,
-                    }}
-                    onPointerDown={(e) => handleNodePointerDown(e, node)}
-                    onClick={(e) => handleNodeClick(e, node.id)}
-                    onDoubleClick={(e) => handleNodeDoubleClick(e, node.machineId)}
-                    className={cn(
-                      "absolute rounded-xl border-2 bg-card shadow-lg cursor-grab active:cursor-grabbing select-none overflow-hidden",
-                      isSelected
-                        ? "border-primary shadow-[0_0_24px_-4px_hsl(var(--primary)/0.55)]"
-                        : "border-border hover:border-primary/60",
-                      isConnectingSrc && "ring-2 ring-primary ring-offset-2 ring-offset-background",
-                    )}
-                    title="Duplo clique para ver detalhes"
-                  >
-                    {/* "Photo" area — colored placeholder per machine */}
-                    <div
-                      className="relative h-[140px] w-full flex items-center justify-center"
-                      style={{
-                        background: `linear-gradient(135deg, hsl(${hue} 55% 22%) 0%, hsl(${(hue + 40) % 360} 60% 14%) 100%)`,
-                      }}
-                    >
-                      <ImageIcon className="h-10 w-10 text-white/30" />
-                      <span className="absolute top-1.5 left-1.5 text-[9px] font-mono px-1.5 py-0.5 rounded bg-black/40 text-white/80 backdrop-blur-sm">
-                        {machine.model}
-                      </span>
-                    </div>
-
-                    {/* Name only */}
-                    <div className="px-2.5 py-2 h-[60px] flex items-center">
-                      <p className="text-[11px] font-semibold text-foreground line-clamp-2 leading-tight">
-                        {machine.name}
-                      </p>
-                    </div>
-
-                    {/* connection handle right */}
-                    <button
-                      onClick={(e) => startConnection(e, node.id)}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      title="Conectar a outra máquina"
-                      className="absolute -right-2 top-[70px] h-4 w-4 rounded-full bg-primary border-2 border-background hover:scale-125 transition-transform z-10"
-                    />
-                    {/* input handle left */}
-                    <div className="absolute -left-2 top-[70px] h-3 w-3 rounded-full bg-muted border-2 border-background" />
-
-                    {isSelected && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteNode(node.id);
-                        }}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-md hover:scale-110 transition-transform z-20"
-                        title="Remover"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-
               {connectingFrom && (
                 <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 pointer-events-none z-40">
                   <Link2 className="h-3 w-3" />
                   Clique em uma máquina para conectar
                 </div>
               )}
+            </div>
+
+            {/* Floating: reopen left panel */}
+            {!leftOpen && (
+              <Button
+                variant="secondary"
+                size="icon"
+                onClick={() => setLeftOpen(true)}
+                title="Mostrar catálogo"
+                className="absolute top-3 left-3 z-40 h-9 w-9 shadow-lg"
+              >
+                <PanelLeftOpen className="h-4 w-4" />
+              </Button>
+            )}
+
+            {/* Floating: reopen right panel */}
+            {!rightOpen && (
+              <Button
+                variant="secondary"
+                size="icon"
+                onClick={() => setRightOpen(true)}
+                title="Mostrar chat do Fagner"
+                className="absolute top-3 right-3 z-40 h-9 w-9 shadow-lg"
+              >
+                <PanelRightOpen className="h-4 w-4" />
+              </Button>
+            )}
+
+            {/* Floating: zoom controls */}
+            <div className="absolute bottom-4 right-4 z-40 flex flex-col items-center gap-1 rounded-lg border border-border bg-card/95 backdrop-blur shadow-lg p-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={zoomIn}
+                disabled={zoom >= ZOOM_MAX}
+                title="Aumentar zoom"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+              <button
+                onClick={zoomReset}
+                className="text-[10px] font-mono text-muted-foreground hover:text-foreground px-1 py-0.5 rounded"
+                title="Restaurar zoom (100%)"
+              >
+                {Math.round(zoom * 100)}%
+              </button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={zoomOut}
+                disabled={zoom <= ZOOM_MIN}
+                title="Diminuir zoom"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <div className="h-px w-6 bg-border my-0.5" />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={zoomReset}
+                title="Resetar zoom"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </Button>
             </div>
           </main>
 
