@@ -687,18 +687,24 @@ const CreateLine = () => {
               ref={canvasRef}
               onDragOver={handleCanvasDragOver}
               onDrop={handleCanvasDrop}
+              onPointerDown={handleCanvasPointerDown}
               onClick={handleCanvasClick}
-              className="absolute inset-0"
+              className={cn(
+                "absolute inset-0",
+                isPanActive && (panDragRef.current ? "cursor-grabbing" : "cursor-grab"),
+              )}
+              style={{ touchAction: isPanActive ? "none" : undefined }}
             >
-              {/* Zoom-transformed content layer */}
+              {/* Zoom + pan content layer */}
               <div
                 className="absolute top-0 left-0 origin-top-left"
                 style={{
-                  transform: `scale(${zoom})`,
+                  transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
                   // give the wrapper a huge logical size so nodes can sit anywhere
                   width: "10000px",
                   height: "10000px",
-                  transition: isDragging ? "none" : "transform 120ms ease-out",
+                  transition: isDragging || panDragRef.current ? "none" : "transform 120ms ease-out",
+                  pointerEvents: isPanActive ? "none" : undefined,
                 }}
               >
                 {/* SVG layer for edges */}
