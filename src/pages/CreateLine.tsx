@@ -786,6 +786,7 @@ const CreateLine = () => {
           </main>
 
           {/* RIGHT: Chat with Fagner */}
+          {rightOpen && (
           <aside className="w-[340px] flex-shrink-0 border-l border-border bg-card/30 flex flex-col">
             <div className="p-3 border-b border-border flex items-center gap-2">
               <div className="relative">
@@ -803,6 +804,15 @@ const CreateLine = () => {
                   Especialista em linhas industriais
                 </p>
               </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setRightOpen(false)}
+                title="Ocultar chat"
+              >
+                <PanelRightClose className="h-4 w-4" />
+              </Button>
             </div>
 
             <ScrollArea className="flex-1">
