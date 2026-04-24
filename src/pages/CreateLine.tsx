@@ -919,6 +919,7 @@ const CreateLine = () => {
               </div>
             </div>
           </aside>
+          )}
         </div>
       </div>
 
