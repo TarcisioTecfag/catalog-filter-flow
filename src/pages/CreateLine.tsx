@@ -310,6 +310,20 @@ const CreateLine = () => {
     };
   }, [applyDragFrame]);
 
+  // ===== Wheel zoom on the canvas =====
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const onWheel = (ev: WheelEvent) => {
+      // Zoom on plain wheel inside canvas. Always prevent page scroll.
+      ev.preventDefault();
+      const delta = ev.deltaY > 0 ? -0.1 : 0.1;
+      setZoom((z) => clampZoom(parseFloat((z + delta).toFixed(2))));
+    };
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    return () => canvas.removeEventListener("wheel", onWheel as EventListener);
+  }, []);
+
   const handleCanvasClick = () => {
     setSelectedNodeId(null);
     setConnectingFrom(null);
