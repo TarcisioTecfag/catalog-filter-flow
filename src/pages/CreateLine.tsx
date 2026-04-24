@@ -16,6 +16,13 @@ import {
   Wand2,
   AlertTriangle,
   ImageIcon,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
 } from "lucide-react";
 import PageTransition from "@/components/PageTransition";
 import { Input } from "@/components/ui/input";
