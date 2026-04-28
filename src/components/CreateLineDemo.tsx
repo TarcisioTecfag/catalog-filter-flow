@@ -99,6 +99,10 @@ const CreateLineDemo = ({ onDismiss }: CreateLineDemoProps) => {
   const [speech, setSpeech] = useState<string | null>(null);
   // Triggers a celebratory pulse on completed nodes when the line finishes
   const [celebrating, setCelebrating] = useState(false);
+  // "ready to connect" — cursor reached source handle, before drag starts
+  const [readyHandle, setReadyHandle] = useState<number>(-1);
+  // "just connected" — flash target handle + edge briefly after acceptance
+  const [acceptedEdge, setAcceptedEdge] = useState<number>(-1);
 
   // ===== Cursor keyframes (memoized; identical for every cycle) =====
   // Built as a (time, x, y) timeline that mirrors the timeout schedule below.
