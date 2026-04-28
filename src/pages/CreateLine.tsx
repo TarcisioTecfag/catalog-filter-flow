@@ -32,6 +32,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { categories, machines, type Machine } from "@/data/machines";
 import type { LineMachine } from "@/data/industrialLines";
 import MachineDetailModal from "@/components/MachineDetailModal";
+import CreateLineDemo from "@/components/CreateLineDemo";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
