@@ -99,6 +99,10 @@ const CreateLineDemo = ({ onDismiss }: CreateLineDemoProps) => {
   const [speech, setSpeech] = useState<string | null>(null);
   // Triggers a celebratory pulse on completed nodes when the line finishes
   const [celebrating, setCelebrating] = useState(false);
+  // "ready to connect" — cursor reached source handle, before drag starts
+  const [readyHandle, setReadyHandle] = useState<number>(-1);
+  // "just connected" — flash target handle + edge briefly after acceptance
+  const [acceptedEdge, setAcceptedEdge] = useState<number>(-1);
 
   // ===== Cursor keyframes (memoized; identical for every cycle) =====
   // Built as a (time, x, y) timeline that mirrors the timeout schedule below.
@@ -190,13 +194,19 @@ const CreateLineDemo = ({ onDismiss }: CreateLineDemoProps) => {
 
   // ===== Master timeline (real timeouts to keep DOM state in sync) =====
   // Mirrors the cursor waypoints above; offsets are accumulated identically.
+  // We also store cycleStart so the live cursor interpolation below can stay
+  // perfectly synced with the framer-motion keyframe transition.
+  const [cycleStart, setCycleStart] = useState(() => performance.now());
   useEffect(() => {
     setPlaced(0);
     setEdgesDrawn(0);
     setCarrying(-1);
     setDrawingEdge(-1);
+    setReadyHandle(-1);
+    setAcceptedEdge(-1);
     setSpeech(null);
     setCelebrating(false);
+    setCycleStart(performance.now());
 
     const timeouts: number[] = [];
     const at = (ms: number, fn: () => void) => {
@@ -236,16 +246,23 @@ const CreateLineDemo = ({ onDismiss }: CreateLineDemoProps) => {
     at(t + 900, () => setSpeech(null));
 
     for (let i = 0; i < DEMO_MACHINES.length - 1; i++) {
+      const idx = i;
+      // cursor approaches source handle → "ready to connect"
+      at(t + 40, () => setReadyHandle(idx));
       t += T.connectApproach;
       // start drawing the live preview when cursor reaches source handle
-      const idx = i;
-      at(t, () => setDrawingEdge(idx));
+      at(t, () => {
+        setReadyHandle(-1);
+        setDrawingEdge(idx);
+      });
       t += T.connectDraw;
       // commit edge & clear preview when cursor reaches target handle
       at(t, () => {
         setEdgesDrawn((e) => Math.max(e, idx + 1));
         setDrawingEdge(-1);
+        setAcceptedEdge(idx);
       });
+      at(t + 650, () => setAcceptedEdge((cur) => (cur === idx ? -1 : cur)));
       t += T.connectSettle;
     }
 
@@ -263,37 +280,39 @@ const CreateLineDemo = ({ onDismiss }: CreateLineDemoProps) => {
     return () => timeouts.forEach((to) => clearTimeout(to));
   }, [cycle, totalMs]);
 
-  // Live cursor position — read from keyframes by interpolating the current
-  // animation progress. We need it to anchor the preview edge to the cursor
-  // tip. Rather than tracking it via refs (jittery), we recompute on each
-  // frame using rAF only while we're drawing a preview edge.
+  // Live cursor position — interpolated from THE SAME keyframes used by the
+  // framer-motion cursor transition. This guarantees the preview-edge tip is
+  // pixel-perfect on the cursor (no DOM read jitter, no drift).
   const [cursorPos, setCursorPos] = useState({ x: xs[0], y: ys[0] });
   useEffect(() => {
     if (drawingEdge < 0) return;
-    let raf: number;
-    const start = performance.now();
+    let raf = 0;
+    // Replicate framer-motion's default `easeInOut` (cubic) on each segment
+    // so our sample matches the visible cursor exactly.
+    const easeInOut = (t: number) =>
+      t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
     const tick = () => {
-      const elapsed = performance.now() - start;
-      // Find current segment based on cycle start time. Since the cycle
-      // restarts via `setCycle`, the demo overlay's mounted lifetime aligns
-      // with the cycle's elapsed time when drawingEdge becomes positive only
-      // briefly — close enough for visual fidelity.
-      const elapsedNorm = elapsed / totalMs;
-      // We don't know exact cycle start here, so just track cursor against
-      // current real time by sampling the animated transform from DOM.
-      const el = document.getElementById("fagner-cursor");
-      if (el) {
-        const rect = el.getBoundingClientRect();
-        const parent = el.parentElement?.parentElement?.getBoundingClientRect();
-        if (parent) {
-          setCursorPos({ x: rect.left - parent.left, y: rect.top - parent.top });
+      const elapsed = performance.now() - cycleStart;
+      const p = Math.min(1, Math.max(0, elapsed / totalMs));
+      // Locate the segment [i, i+1] containing p.
+      let i = 0;
+      for (let k = 0; k < times.length - 1; k++) {
+        if (p >= times[k] && p <= times[k + 1]) {
+          i = k;
+          break;
         }
+        if (p > times[times.length - 1]) i = times.length - 2;
       }
+      const span = Math.max(1e-6, times[i + 1] - times[i]);
+      const localT = easeInOut((p - times[i]) / span);
+      const x = xs[i] + (xs[i + 1] - xs[i]) * localT;
+      const y = ys[i] + (ys[i + 1] - ys[i]) * localT;
+      setCursorPos({ x, y });
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [drawingEdge, totalMs]);
+  }, [drawingEdge, totalMs, cycleStart, xs, ys, times]);
 
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden z-30">
@@ -429,6 +448,21 @@ const CreateLineDemo = ({ onDismiss }: CreateLineDemoProps) => {
                 animate={{ pathLength: 1, opacity: 1 }}
                 transition={{ duration: 0.55, ease: "easeOut" }}
               />
+              {/* Acceptance flash — bright white pulse along the freshly
+                  committed path, fades out quickly. */}
+              {acceptedEdge === i && (
+                <motion.path
+                  d={d}
+                  fill="none"
+                  stroke="white"
+                  strokeWidth={3}
+                  strokeLinecap="round"
+                  initial={{ opacity: 0.95, pathLength: 0 }}
+                  animate={{ opacity: 0, pathLength: 1 }}
+                  transition={{ duration: 0.6, ease: "easeOut" }}
+                  style={{ filter: "drop-shadow(0 0 6px hsl(var(--primary)))" }}
+                />
+              )}
               {/* Travelling spark to imply data flow */}
               {edgesDrawn > i && (
                 <motion.circle
@@ -465,14 +499,29 @@ const CreateLineDemo = ({ onDismiss }: CreateLineDemoProps) => {
           const dx = Math.abs(tx - sx) * 0.5;
           const d = `M ${sx} ${sy} C ${sx + dx} ${sy}, ${tx - dx} ${ty}, ${tx} ${ty}`;
           return (
-            <path
-              d={d}
-              fill="none"
-              stroke="hsl(var(--primary))"
-              strokeWidth={2}
-              strokeDasharray="6 4"
-              opacity={0.85}
-            />
+            <g>
+              {/* soft glow underlay */}
+              <path
+                d={d}
+                fill="none"
+                stroke="hsl(var(--primary))"
+                strokeWidth={6}
+                strokeLinecap="round"
+                opacity={0.25}
+                style={{ filter: "blur(3px)" }}
+              />
+              <path
+                d={d}
+                fill="none"
+                stroke="hsl(var(--primary))"
+                strokeWidth={2}
+                strokeDasharray="6 4"
+                opacity={0.95}
+              />
+              {/* tip dot — anchors visually to the cursor */}
+              <circle cx={tx} cy={ty} r={4} fill="hsl(var(--primary))" />
+              <circle cx={tx} cy={ty} r={7} fill="hsl(var(--primary))" opacity={0.25} />
+            </g>
           );
         })()}
       </svg>
@@ -537,7 +586,37 @@ const CreateLineDemo = ({ onDismiss }: CreateLineDemoProps) => {
                 </p>
               </div>
               <span className="absolute -right-1.5 top-[36px] h-3 w-3 rounded-full bg-primary border-2 border-background shadow-md" />
-              <span className="absolute -left-1.5 top-[36px] h-2.5 w-2.5 rounded-full bg-muted border-2 border-background" />
+              {/* Source handle "ready to connect" pulse */}
+              {readyHandle === i && (
+                <>
+                  <motion.span
+                    className="absolute -right-2.5 top-[33px] h-5 w-5 rounded-full border-2 border-primary pointer-events-none"
+                    initial={{ opacity: 0.9, scale: 0.6 }}
+                    animate={{ opacity: 0, scale: 1.8 }}
+                    transition={{ duration: 0.9, repeat: Infinity, ease: "easeOut" }}
+                  />
+                  <motion.span
+                    className="absolute -right-1.5 top-[36px] h-3 w-3 rounded-full bg-primary pointer-events-none"
+                    animate={{ scale: [1, 1.35, 1] }}
+                    transition={{ duration: 0.7, repeat: Infinity, ease: "easeInOut" }}
+                  />
+                </>
+              )}
+              {/* Target handle "accepted" highlight */}
+              {acceptedEdge === i - 1 && (
+                <motion.span
+                  className="absolute -left-2.5 top-[33px] h-5 w-5 rounded-full border-2 border-primary pointer-events-none"
+                  initial={{ opacity: 0.95, scale: 0.5 }}
+                  animate={{ opacity: 0, scale: 2 }}
+                  transition={{ duration: 0.7, ease: "easeOut" }}
+                />
+              )}
+              <span
+                className={cn(
+                  "absolute -left-1.5 top-[36px] h-2.5 w-2.5 rounded-full border-2 border-background transition-colors",
+                  acceptedEdge === i - 1 ? "bg-primary" : "bg-muted",
+                )}
+              />
             </motion.div>
           );
         })}
