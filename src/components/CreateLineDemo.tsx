@@ -448,6 +448,21 @@ const CreateLineDemo = ({ onDismiss }: CreateLineDemoProps) => {
                 animate={{ pathLength: 1, opacity: 1 }}
                 transition={{ duration: 0.55, ease: "easeOut" }}
               />
+              {/* Acceptance flash — bright white pulse along the freshly
+                  committed path, fades out quickly. */}
+              {acceptedEdge === i && (
+                <motion.path
+                  d={d}
+                  fill="none"
+                  stroke="white"
+                  strokeWidth={3}
+                  strokeLinecap="round"
+                  initial={{ opacity: 0.95, pathLength: 0 }}
+                  animate={{ opacity: 0, pathLength: 1 }}
+                  transition={{ duration: 0.6, ease: "easeOut" }}
+                  style={{ filter: "drop-shadow(0 0 6px hsl(var(--primary)))" }}
+                />
+              )}
               {/* Travelling spark to imply data flow */}
               {edgesDrawn > i && (
                 <motion.circle
