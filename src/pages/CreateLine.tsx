@@ -32,6 +32,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { categories, machines, type Machine } from "@/data/machines";
 import type { LineMachine } from "@/data/industrialLines";
 import MachineDetailModal from "@/components/MachineDetailModal";
+import CreateLineDemo from "@/components/CreateLineDemo";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -97,6 +98,10 @@ const CreateLine = () => {
   }, [pan]);
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
+
+  // Tutorial demo overlay (shown while canvas is empty). Users can dismiss it
+  // and replay it on demand from a small floating button.
+  const [demoVisible, setDemoVisible] = useState(true);
 
   // pan mode (toggled by Space key or dedicated button); spaceHeld tracks
   // momentary activation while the key is held.
@@ -847,7 +852,7 @@ const CreateLine = () => {
               </div>
 
               {/* Empty state — kept in screen space (not zoomed) */}
-              {nodes.length === 0 && (
+              {nodes.length === 0 && !demoVisible && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="text-center max-w-sm">
                     <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary mb-4">
@@ -856,12 +861,24 @@ const CreateLine = () => {
                     <h3 className="font-display text-xl font-bold mb-2">
                       Comece arrastando máquinas
                     </h3>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground mb-4">
                       Selecione equipamentos do catálogo à esquerda e solte aqui para montar sua
                       linha. Conecte as máquinas para definir o fluxo de produção.
                     </p>
+                    <button
+                      onClick={() => setDemoVisible(true)}
+                      className="pointer-events-auto inline-flex items-center gap-1.5 text-xs text-primary hover:underline font-medium"
+                    >
+                      <Wand2 className="h-3 w-3" />
+                      Ver demonstração novamente
+                    </button>
                   </div>
                 </div>
+              )}
+
+              {/* Animated tutorial: Fagner builds a line for the user */}
+              {nodes.length === 0 && demoVisible && (
+                <CreateLineDemo onDismiss={() => setDemoVisible(false)} />
               )}
 
               {connectingFrom && (
