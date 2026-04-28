@@ -556,7 +556,37 @@ const CreateLineDemo = ({ onDismiss }: CreateLineDemoProps) => {
                 </p>
               </div>
               <span className="absolute -right-1.5 top-[36px] h-3 w-3 rounded-full bg-primary border-2 border-background shadow-md" />
-              <span className="absolute -left-1.5 top-[36px] h-2.5 w-2.5 rounded-full bg-muted border-2 border-background" />
+              {/* Source handle "ready to connect" pulse */}
+              {readyHandle === i && (
+                <>
+                  <motion.span
+                    className="absolute -right-2.5 top-[33px] h-5 w-5 rounded-full border-2 border-primary pointer-events-none"
+                    initial={{ opacity: 0.9, scale: 0.6 }}
+                    animate={{ opacity: 0, scale: 1.8 }}
+                    transition={{ duration: 0.9, repeat: Infinity, ease: "easeOut" }}
+                  />
+                  <motion.span
+                    className="absolute -right-1.5 top-[36px] h-3 w-3 rounded-full bg-primary pointer-events-none"
+                    animate={{ scale: [1, 1.35, 1] }}
+                    transition={{ duration: 0.7, repeat: Infinity, ease: "easeInOut" }}
+                  />
+                </>
+              )}
+              {/* Target handle "accepted" highlight */}
+              {acceptedEdge === i - 1 && (
+                <motion.span
+                  className="absolute -left-2.5 top-[33px] h-5 w-5 rounded-full border-2 border-primary pointer-events-none"
+                  initial={{ opacity: 0.95, scale: 0.5 }}
+                  animate={{ opacity: 0, scale: 2 }}
+                  transition={{ duration: 0.7, ease: "easeOut" }}
+                />
+              )}
+              <span
+                className={cn(
+                  "absolute -left-1.5 top-[36px] h-2.5 w-2.5 rounded-full border-2 border-background transition-colors",
+                  acceptedEdge === i - 1 ? "bg-primary" : "bg-muted",
+                )}
+              />
             </motion.div>
           );
         })}
