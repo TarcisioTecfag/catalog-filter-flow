@@ -499,14 +499,29 @@ const CreateLineDemo = ({ onDismiss }: CreateLineDemoProps) => {
           const dx = Math.abs(tx - sx) * 0.5;
           const d = `M ${sx} ${sy} C ${sx + dx} ${sy}, ${tx - dx} ${ty}, ${tx} ${ty}`;
           return (
-            <path
-              d={d}
-              fill="none"
-              stroke="hsl(var(--primary))"
-              strokeWidth={2}
-              strokeDasharray="6 4"
-              opacity={0.85}
-            />
+            <g>
+              {/* soft glow underlay */}
+              <path
+                d={d}
+                fill="none"
+                stroke="hsl(var(--primary))"
+                strokeWidth={6}
+                strokeLinecap="round"
+                opacity={0.25}
+                style={{ filter: "blur(3px)" }}
+              />
+              <path
+                d={d}
+                fill="none"
+                stroke="hsl(var(--primary))"
+                strokeWidth={2}
+                strokeDasharray="6 4"
+                opacity={0.95}
+              />
+              {/* tip dot — anchors visually to the cursor */}
+              <circle cx={tx} cy={ty} r={4} fill="hsl(var(--primary))" />
+              <circle cx={tx} cy={ty} r={7} fill="hsl(var(--primary))" opacity={0.25} />
+            </g>
           );
         })()}
       </svg>
