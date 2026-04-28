@@ -99,6 +99,10 @@ const CreateLine = () => {
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
 
+  // Tutorial demo overlay (shown while canvas is empty). Users can dismiss it
+  // and replay it on demand from a small floating button.
+  const [demoVisible, setDemoVisible] = useState(true);
+
   // pan mode (toggled by Space key or dedicated button); spaceHeld tracks
   // momentary activation while the key is held.
   const [panMode, setPanMode] = useState(false);
