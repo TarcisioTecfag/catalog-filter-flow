@@ -716,6 +716,7 @@ const CreateLine = () => {
                   {filteredMachines.map((m) => (
                     <div
                       key={m.id}
+                      data-catalog-machine={m.id}
                       draggable
                       onDragStart={(e) => handleSidebarDragStart(e, m.id)}
                       className="group cursor-grab active:cursor-grabbing rounded-md border border-border bg-card p-2.5 hover:border-primary/50 hover:bg-accent/30 transition-colors"
