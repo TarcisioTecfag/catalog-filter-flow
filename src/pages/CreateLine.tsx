@@ -202,6 +202,21 @@ const CreateLine = () => {
     return map;
   }, []);
 
+  // Instantiate the Fagner agent. It mutates the same nodes/edges arrays the
+  // user manipulates by hand, so anything Fagner does is indistinguishable
+  // from a real interaction once committed.
+  const fagner = useFagnerAgent({
+    setNodes,
+    setEdges,
+    setSelectedNodeId,
+    canvasRef,
+    zoomRef,
+    panRef,
+    machineMap,
+    nodeWidth: NODE_W,
+    nodeHeight: NODE_H,
+  });
+
   // Convert catalog Machine -> LineMachine shape expected by the modal
   const toLineMachine = useCallback((m: Machine): LineMachine => {
     return {
