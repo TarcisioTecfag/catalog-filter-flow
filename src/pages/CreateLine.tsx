@@ -34,7 +34,7 @@ import type { LineMachine } from "@/data/industrialLines";
 import MachineDetailModal from "@/components/MachineDetailModal";
 import CreateLineDemo from "@/components/CreateLineDemo";
 import FagnerCursor from "@/components/fagner/FagnerCursor";
-import { useFagnerAgent } from "@/components/fagner/useFagnerAgent";
+import { useFagnerAgent, type FagnerAction } from "@/components/fagner/useFagnerAgent";
 import { interpretChat } from "@/components/fagner/interpretChat";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
