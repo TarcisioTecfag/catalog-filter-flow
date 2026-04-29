@@ -576,64 +576,77 @@ const CreateLine = () => {
   };
 
   // ===== Chat (mock) =====
-  const generateFagnerReply = useCallback(
-    (userMsg: string, currentNodes: FlowNode[]): string => {
-      const lower = userMsg.toLowerCase();
-      const nodeCount = currentNodes.length;
-      const machineNames = currentNodes
-        .map((n) => machineMap.get(n.machineId)?.name)
-        .filter(Boolean);
+  // Live ref to nodes for use inside async chat handlers (so the interpreter
+  // always sees the freshest canvas state when computing reply/actions).
+  const nodesRef = useRef<FlowNode[]>(nodes);
+  const edgesRef = useRef<FlowEdge[]>(edges);
+  useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
+  useEffect(() => {
+    edgesRef.current = edges;
+  }, [edges]);
 
-      if (lower.includes("analis") || lower.includes("revis") || lower.includes("verific")) {
-        if (nodeCount === 0) {
-          return "Seu canvas está vazio. Arraste algumas máquinas do menu à esquerda para que eu possa analisar o fluxo.";
-        }
-        return `Analisando seu fluxo com ${nodeCount} máquina(s):\n\n${machineNames
-          .map((n, i) => `${i + 1}. ${n}`)
-          .join("\n")}\n\n⚠️ Pontos de atenção:\n• Verifique se a vazão de cada etapa é compatível.\n• Recomendo adicionar uma esteira de transição entre processos críticos.\n• Considere um sistema de inspeção visual antes do envase.`;
-      }
-
-      if (lower.includes("envase") || lower.includes("liquido") || lower.includes("líquido")) {
-        return "Para uma linha de envase de líquidos, sugiro:\n\n1️⃣ Esteira transportadora inox\n2️⃣ Envasadora de líquidos (4 ou 6 bicos)\n3️⃣ Rosqueadora automática linear\n4️⃣ Rotuladora\n5️⃣ Datadora\n6️⃣ Encartuchadeira\n\nQuer que eu sugira modelos específicos do nosso catálogo?";
-      }
-
-      if (lower.includes("erro") || lower.includes("defeito") || lower.includes("problema")) {
-        return "Os defeitos mais comuns em linhas industriais são:\n\n🔴 Desincronização de velocidade entre máquinas\n🔴 Falta de sensor de presença antes do envase\n🔴 Esteiras subdimensionadas para o pico de produção\n🔴 Ausência de inspeção visual após rotulagem\n\nMe diga qual etapa você quer otimizar e te ajudo a prevenir.";
-      }
-
-      if (lower.includes("oi") || lower.includes("olá") || lower.includes("ola")) {
-        return "Olá! 👋 Posso te ajudar a montar uma linha do zero, sugerir máquinas, ou analisar o fluxo que você está criando. O que prefere?";
-      }
-
-      if (nodeCount > 0) {
-        return `Vi que você já tem ${nodeCount} máquina(s) no canvas. Posso:\n\n• Analisar o fluxo atual\n• Sugerir a próxima etapa\n• Apontar possíveis gargalos\n\nO que prefere?`;
-      }
-
-      return "Entendi. Para começar, me conta um pouco mais sobre o produto que você quer envasar/produzir. Assim eu monto um fluxo otimizado pra você.";
-    },
-    [machineMap],
-  );
-
-  const sendChat = () => {
+  const sendChat = useCallback(async () => {
     const text = chatInput.trim();
     if (!text || chatLoading) return;
     const userMsg: ChatMessage = { id: `m_${Date.now()}`, role: "user", content: text };
     setChatMessages((prev) => [...prev, userMsg]);
     setChatInput("");
     setChatLoading(true);
-    setTimeout(() => {
-      const reply: ChatMessage = {
-        id: `m_${Date.now() + 1}`,
-        role: "assistant",
-        content: generateFagnerReply(text, nodes),
-      };
-      setChatMessages((prev) => [...prev, reply]);
-      setChatLoading(false);
-    }, 800);
-  };
 
+    // 1) Run the local interpreter on the current canvas snapshot.
+    const result = interpretChat({
+      text,
+      nodes: nodesRef.current,
+      edges: edgesRef.current,
+      nodeWidth: NODE_W,
+      nodeHeight: NODE_H,
+      layoutOrigin: NEW_LINE_LAYOUT.origin,
+      layoutGapX: NEW_LINE_LAYOUT.gapX,
+    });
+
+    // 2) Post Fagner's reply with a small typing delay (feels more human).
+    setTimeout(() => {
+      setChatMessages((prev) => [
+        ...prev,
+        { id: `m_${Date.now() + 1}`, role: "assistant", content: result.reply },
+      ]);
+      setChatLoading(false);
+    }, 600);
+
+    // 3) Hide the empty-state demo while Fagner is working on the canvas.
+    if (result.actions.length > 0) {
+      setDemoVisible(false);
+      // Snapshot existing node ids so we can detect what was newly dropped.
+      const beforeIds = new Set(nodesRef.current.map((n) => n.id));
+      await fagner.run(result.actions);
+
+      // 4) For "monte uma linha", auto-connect the freshly dropped nodes in
+      //    drop order. We diff node ids against the snapshot — the agent
+      //    appends nodes in order, so React state preserves insertion order.
+      if (result.autoConnectNewDrops) {
+        const newOrdered = nodesRef.current.filter((n) => !beforeIds.has(n.id));
+        if (newOrdered.length >= 2) {
+          const connectActions: FagnerAction[] = [];
+          connectActions.push({ kind: "say", text: "Agora as conexões.", holdMs: 700 });
+          for (let i = 0; i < newOrdered.length - 1; i++) {
+            connectActions.push({
+              kind: "connect",
+              sourceId: newOrdered[i].id,
+              targetId: newOrdered[i + 1].id,
+            });
+          }
+          connectActions.push({ kind: "say", text: "Linha pronta! ✨", holdMs: 1200 });
+          await fagner.run(connectActions);
+        }
+      }
+    }
+  }, [chatInput, chatLoading, fagner, NEW_LINE_LAYOUT]);
+
+  // Quick-action chips wired to natural-language commands the agent understands.
   const askFagnerToBuild = () => {
-    setChatInput("Monte uma linha de envase de líquidos para mim");
+    setChatInput("Monte uma linha de envase de líquidos");
   };
 
   return (
