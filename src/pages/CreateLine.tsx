@@ -33,6 +33,9 @@ import { categories, machines, type Machine } from "@/data/machines";
 import type { LineMachine } from "@/data/industrialLines";
 import MachineDetailModal from "@/components/MachineDetailModal";
 import CreateLineDemo from "@/components/CreateLineDemo";
+import FagnerCursor from "@/components/fagner/FagnerCursor";
+import { useFagnerAgent, type FagnerAction } from "@/components/fagner/useFagnerAgent";
+import { interpretChat } from "@/components/fagner/interpretChat";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -167,11 +170,18 @@ const CreateLine = () => {
       id: "welcome",
       role: "assistant",
       content:
-        "Olá! Sou o Fagner, seu assistente de linhas industriais. Posso te ajudar a montar um fluxo, sugerir máquinas para uma etapa específica, ou analisar a linha que você está criando. Por onde começamos?",
+        "Olá! Sou o Fagner. Diz o que precisa que eu faço aqui no canvas:\n\n• \"monte uma linha de envase\"\n• \"adicione uma rotuladora\"\n• \"conecte a esteira na envasadora\"\n• \"remova a datadora\" / \"remova a conexão\"\n• \"conserte o fluxo\"",
     },
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+
+  // ===== Fagner agent (programmatic canvas API) =====
+  // Layout for new lines built by the agent. Centered horizontally on canvas.
+  const NEW_LINE_LAYOUT = useMemo(
+    () => ({ origin: { x: 240, y: 220 }, gapX: 80 }),
+    [],
+  );
 
   const filteredMachines = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -191,6 +201,21 @@ const CreateLine = () => {
     machines.forEach((m) => map.set(m.id, m));
     return map;
   }, []);
+
+  // Instantiate the Fagner agent. It mutates the same nodes/edges arrays the
+  // user manipulates by hand, so anything Fagner does is indistinguishable
+  // from a real interaction once committed.
+  const fagner = useFagnerAgent({
+    setNodes,
+    setEdges,
+    setSelectedNodeId,
+    canvasRef,
+    zoomRef,
+    panRef,
+    machineMap,
+    nodeWidth: NODE_W,
+    nodeHeight: NODE_H,
+  });
 
   // Convert catalog Machine -> LineMachine shape expected by the modal
   const toLineMachine = useCallback((m: Machine): LineMachine => {
@@ -551,64 +576,77 @@ const CreateLine = () => {
   };
 
   // ===== Chat (mock) =====
-  const generateFagnerReply = useCallback(
-    (userMsg: string, currentNodes: FlowNode[]): string => {
-      const lower = userMsg.toLowerCase();
-      const nodeCount = currentNodes.length;
-      const machineNames = currentNodes
-        .map((n) => machineMap.get(n.machineId)?.name)
-        .filter(Boolean);
+  // Live ref to nodes for use inside async chat handlers (so the interpreter
+  // always sees the freshest canvas state when computing reply/actions).
+  const nodesRef = useRef<FlowNode[]>(nodes);
+  const edgesRef = useRef<FlowEdge[]>(edges);
+  useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
+  useEffect(() => {
+    edgesRef.current = edges;
+  }, [edges]);
 
-      if (lower.includes("analis") || lower.includes("revis") || lower.includes("verific")) {
-        if (nodeCount === 0) {
-          return "Seu canvas está vazio. Arraste algumas máquinas do menu à esquerda para que eu possa analisar o fluxo.";
-        }
-        return `Analisando seu fluxo com ${nodeCount} máquina(s):\n\n${machineNames
-          .map((n, i) => `${i + 1}. ${n}`)
-          .join("\n")}\n\n⚠️ Pontos de atenção:\n• Verifique se a vazão de cada etapa é compatível.\n• Recomendo adicionar uma esteira de transição entre processos críticos.\n• Considere um sistema de inspeção visual antes do envase.`;
-      }
-
-      if (lower.includes("envase") || lower.includes("liquido") || lower.includes("líquido")) {
-        return "Para uma linha de envase de líquidos, sugiro:\n\n1️⃣ Esteira transportadora inox\n2️⃣ Envasadora de líquidos (4 ou 6 bicos)\n3️⃣ Rosqueadora automática linear\n4️⃣ Rotuladora\n5️⃣ Datadora\n6️⃣ Encartuchadeira\n\nQuer que eu sugira modelos específicos do nosso catálogo?";
-      }
-
-      if (lower.includes("erro") || lower.includes("defeito") || lower.includes("problema")) {
-        return "Os defeitos mais comuns em linhas industriais são:\n\n🔴 Desincronização de velocidade entre máquinas\n🔴 Falta de sensor de presença antes do envase\n🔴 Esteiras subdimensionadas para o pico de produção\n🔴 Ausência de inspeção visual após rotulagem\n\nMe diga qual etapa você quer otimizar e te ajudo a prevenir.";
-      }
-
-      if (lower.includes("oi") || lower.includes("olá") || lower.includes("ola")) {
-        return "Olá! 👋 Posso te ajudar a montar uma linha do zero, sugerir máquinas, ou analisar o fluxo que você está criando. O que prefere?";
-      }
-
-      if (nodeCount > 0) {
-        return `Vi que você já tem ${nodeCount} máquina(s) no canvas. Posso:\n\n• Analisar o fluxo atual\n• Sugerir a próxima etapa\n• Apontar possíveis gargalos\n\nO que prefere?`;
-      }
-
-      return "Entendi. Para começar, me conta um pouco mais sobre o produto que você quer envasar/produzir. Assim eu monto um fluxo otimizado pra você.";
-    },
-    [machineMap],
-  );
-
-  const sendChat = () => {
+  const sendChat = useCallback(async () => {
     const text = chatInput.trim();
     if (!text || chatLoading) return;
     const userMsg: ChatMessage = { id: `m_${Date.now()}`, role: "user", content: text };
     setChatMessages((prev) => [...prev, userMsg]);
     setChatInput("");
     setChatLoading(true);
-    setTimeout(() => {
-      const reply: ChatMessage = {
-        id: `m_${Date.now() + 1}`,
-        role: "assistant",
-        content: generateFagnerReply(text, nodes),
-      };
-      setChatMessages((prev) => [...prev, reply]);
-      setChatLoading(false);
-    }, 800);
-  };
 
+    // 1) Run the local interpreter on the current canvas snapshot.
+    const result = interpretChat({
+      text,
+      nodes: nodesRef.current,
+      edges: edgesRef.current,
+      nodeWidth: NODE_W,
+      nodeHeight: NODE_H,
+      layoutOrigin: NEW_LINE_LAYOUT.origin,
+      layoutGapX: NEW_LINE_LAYOUT.gapX,
+    });
+
+    // 2) Post Fagner's reply with a small typing delay (feels more human).
+    setTimeout(() => {
+      setChatMessages((prev) => [
+        ...prev,
+        { id: `m_${Date.now() + 1}`, role: "assistant", content: result.reply },
+      ]);
+      setChatLoading(false);
+    }, 600);
+
+    // 3) Hide the empty-state demo while Fagner is working on the canvas.
+    if (result.actions.length > 0) {
+      setDemoVisible(false);
+      // Snapshot existing node ids so we can detect what was newly dropped.
+      const beforeIds = new Set(nodesRef.current.map((n) => n.id));
+      await fagner.run(result.actions);
+
+      // 4) For "monte uma linha", auto-connect the freshly dropped nodes in
+      //    drop order. We diff node ids against the snapshot — the agent
+      //    appends nodes in order, so React state preserves insertion order.
+      if (result.autoConnectNewDrops) {
+        const newOrdered = nodesRef.current.filter((n) => !beforeIds.has(n.id));
+        if (newOrdered.length >= 2) {
+          const connectActions: FagnerAction[] = [];
+          connectActions.push({ kind: "say", text: "Agora as conexões.", holdMs: 700 });
+          for (let i = 0; i < newOrdered.length - 1; i++) {
+            connectActions.push({
+              kind: "connect",
+              sourceId: newOrdered[i].id,
+              targetId: newOrdered[i + 1].id,
+            });
+          }
+          connectActions.push({ kind: "say", text: "Linha pronta! ✨", holdMs: 1200 });
+          await fagner.run(connectActions);
+        }
+      }
+    }
+  }, [chatInput, chatLoading, fagner, NEW_LINE_LAYOUT]);
+
+  // Quick-action chips wired to natural-language commands the agent understands.
   const askFagnerToBuild = () => {
-    setChatInput("Monte uma linha de envase de líquidos para mim");
+    setChatInput("Monte uma linha de envase de líquidos");
   };
 
   return (
@@ -691,6 +729,7 @@ const CreateLine = () => {
                   {filteredMachines.map((m) => (
                     <div
                       key={m.id}
+                      data-catalog-machine={m.id}
                       draggable
                       onDragStart={(e) => handleSidebarDragStart(e, m.id)}
                       className="group cursor-grab active:cursor-grabbing rounded-md border border-border bg-card p-2.5 hover:border-primary/50 hover:bg-accent/30 transition-colors"
@@ -824,6 +863,7 @@ const CreateLine = () => {
 
                       {/* connection handle right */}
                       <button
+                        data-source-handle={node.id}
                         onClick={(e) => startConnection(e, node.id)}
                         onPointerDown={(e) => e.stopPropagation()}
                         onMouseDown={(e) => e.stopPropagation()}
@@ -835,6 +875,7 @@ const CreateLine = () => {
 
                       {isSelected && (
                         <button
+                          data-delete-node={node.id}
                           onClick={(e) => {
                             e.stopPropagation();
                             deleteNode(node.id);
@@ -876,8 +917,8 @@ const CreateLine = () => {
                 </div>
               )}
 
-              {/* Animated tutorial: Fagner builds a line for the user */}
-              {nodes.length === 0 && demoVisible && (
+              {/* Animated tutorial: only when canvas is empty AND Fagner is idle. */}
+              {nodes.length === 0 && demoVisible && !fagner.running && (
                 <CreateLineDemo onDismiss={() => setDemoVisible(false)} />
               )}
 
@@ -888,6 +929,17 @@ const CreateLine = () => {
                 </div>
               )}
             </div>
+
+            {/* Fagner virtual cursor — overlays the canvas (NOT zoomed/panned). */}
+            <FagnerCursor cursor={fagner.cursor} machineMap={machineMap} />
+
+            {/* "Fagner is working" indicator */}
+            {fagner.running && (
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 pointer-events-none flex items-center gap-2 bg-primary/90 text-primary-foreground text-xs px-3 py-1.5 rounded-full shadow-lg">
+                <Sparkles className="h-3 w-3 animate-pulse" />
+                Fagner está trabalhando…
+              </div>
+            )}
 
             {/* Floating: reopen left panel */}
             {!leftOpen && (
@@ -1072,20 +1124,26 @@ const CreateLine = () => {
                   onClick={askFagnerToBuild}
                   className="text-[10px] px-2 py-1 rounded-full bg-secondary hover:bg-accent text-secondary-foreground transition-colors"
                 >
-                  Sugerir linha
+                  Montar linha de envase
                 </button>
                 <button
-                  onClick={() => setChatInput("Analise meu fluxo atual")}
+                  onClick={() => setChatInput("Adicione uma rotuladora")}
                   className="text-[10px] px-2 py-1 rounded-full bg-secondary hover:bg-accent text-secondary-foreground transition-colors"
                 >
-                  Analisar fluxo
+                  + Rotuladora
                 </button>
                 <button
-                  onClick={() => setChatInput("Quais erros posso prevenir?")}
+                  onClick={() => setChatInput("Conserte o fluxo")}
                   className="text-[10px] px-2 py-1 rounded-full bg-secondary hover:bg-accent text-secondary-foreground transition-colors flex items-center gap-1"
                 >
                   <AlertTriangle className="h-2.5 w-2.5" />
-                  Prevenir erros
+                  Consertar fluxo
+                </button>
+                <button
+                  onClick={() => setChatInput("Analise meu fluxo")}
+                  className="text-[10px] px-2 py-1 rounded-full bg-secondary hover:bg-accent text-secondary-foreground transition-colors"
+                >
+                  Analisar
                 </button>
               </div>
               <div className="flex gap-2">
