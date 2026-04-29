@@ -170,7 +170,7 @@ const CreateLine = () => {
       id: "welcome",
       role: "assistant",
       content:
-        "Olá! Sou o Fagner, seu assistente de linhas industriais. Posso te ajudar a montar um fluxo, sugerir máquinas para uma etapa específica, ou analisar a linha que você está criando. Por onde começamos?",
+        "Olá! Sou o Fagner. Diz o que precisa que eu faço aqui no canvas:\n\n• \"monte uma linha de envase\"\n• \"adicione uma rotuladora\"\n• \"conecte a esteira na envasadora\"\n• \"remova a datadora\" / \"remova a conexão\"\n• \"conserte o fluxo\"",
     },
   ]);
   const [chatInput, setChatInput] = useState("");
