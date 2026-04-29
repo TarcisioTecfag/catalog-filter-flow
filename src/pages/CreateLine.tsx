@@ -1124,20 +1124,26 @@ const CreateLine = () => {
                   onClick={askFagnerToBuild}
                   className="text-[10px] px-2 py-1 rounded-full bg-secondary hover:bg-accent text-secondary-foreground transition-colors"
                 >
-                  Sugerir linha
+                  Montar linha de envase
                 </button>
                 <button
-                  onClick={() => setChatInput("Analise meu fluxo atual")}
+                  onClick={() => setChatInput("Adicione uma rotuladora")}
                   className="text-[10px] px-2 py-1 rounded-full bg-secondary hover:bg-accent text-secondary-foreground transition-colors"
                 >
-                  Analisar fluxo
+                  + Rotuladora
                 </button>
                 <button
-                  onClick={() => setChatInput("Quais erros posso prevenir?")}
+                  onClick={() => setChatInput("Conserte o fluxo")}
                   className="text-[10px] px-2 py-1 rounded-full bg-secondary hover:bg-accent text-secondary-foreground transition-colors flex items-center gap-1"
                 >
                   <AlertTriangle className="h-2.5 w-2.5" />
-                  Prevenir erros
+                  Consertar fluxo
+                </button>
+                <button
+                  onClick={() => setChatInput("Analise meu fluxo")}
+                  className="text-[10px] px-2 py-1 rounded-full bg-secondary hover:bg-accent text-secondary-foreground transition-colors"
+                >
+                  Analisar
                 </button>
               </div>
               <div className="flex gap-2">
