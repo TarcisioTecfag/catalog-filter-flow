@@ -176,6 +176,13 @@ const CreateLine = () => {
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
 
+  // ===== Fagner agent (programmatic canvas API) =====
+  // Layout for new lines built by the agent. Centered horizontally on canvas.
+  const NEW_LINE_LAYOUT = useMemo(
+    () => ({ origin: { x: 240, y: 220 }, gapX: 80 }),
+    [],
+  );
+
   const filteredMachines = useMemo(() => {
     const q = search.trim().toLowerCase();
     return machines.filter((m) => {
