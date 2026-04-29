@@ -917,8 +917,8 @@ const CreateLine = () => {
                 </div>
               )}
 
-              {/* Animated tutorial: Fagner builds a line for the user */}
-              {nodes.length === 0 && demoVisible && (
+              {/* Animated tutorial: only when canvas is empty AND Fagner is idle. */}
+              {nodes.length === 0 && demoVisible && !fagner.running && (
                 <CreateLineDemo onDismiss={() => setDemoVisible(false)} />
               )}
 
@@ -929,6 +929,17 @@ const CreateLine = () => {
                 </div>
               )}
             </div>
+
+            {/* Fagner virtual cursor — overlays the canvas (NOT zoomed/panned). */}
+            <FagnerCursor cursor={fagner.cursor} machineMap={machineMap} />
+
+            {/* "Fagner is working" indicator */}
+            {fagner.running && (
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 pointer-events-none flex items-center gap-2 bg-primary/90 text-primary-foreground text-xs px-3 py-1.5 rounded-full shadow-lg">
+                <Sparkles className="h-3 w-3 animate-pulse" />
+                Fagner está trabalhando…
+              </div>
+            )}
 
             {/* Floating: reopen left panel */}
             {!leftOpen && (
