@@ -24,6 +24,12 @@ export interface InterpretInput {
 export interface InterpretResult {
   reply: string;
   actions: FagnerAction[];
+  /**
+   * When true, the orchestrator should append `connect` actions linking each
+   * newly-dropped node to the previous one, in the order they were dropped.
+   * Used by "monte uma linha" since drop ids only exist at runtime.
+   */
+  autoConnectNewDrops?: boolean;
 }
 
 const norm = (s: string) =>
@@ -132,16 +138,12 @@ export function interpretChat(input: InterpretInput): InterpretResult {
     else if (/rotul/.test(q)) kind = "rotulagem";
     const list = curatedLine(kind);
     const { actions } = buildAssembleActions(list, layoutOrigin, nodeWidth, layoutGapX);
-    // Append a "connect-as-built" sentinel: see runAssembledLine below.
-    actions.push({ kind: "say", text: "Agora as conexões.", holdMs: 900 });
-    actions.push({ kind: "wait", ms: 200 });
-    // Connection actions are filled by orchestrator after drops resolve.
-    actions.push({ kind: "wait", ms: 1 } /* placeholder, see orchestrator */);
     return {
       reply: `Vou montar uma linha de ${kind} com ${list.length} máquinas: ${list
         .map((m) => m.name)
         .join(" → ")}. Pode acompanhar no canvas.`,
       actions,
+      autoConnectNewDrops: true,
     };
   }
 
