@@ -850,6 +850,7 @@ const CreateLine = () => {
 
                       {/* connection handle right */}
                       <button
+                        data-source-handle={node.id}
                         onClick={(e) => startConnection(e, node.id)}
                         onPointerDown={(e) => e.stopPropagation()}
                         onMouseDown={(e) => e.stopPropagation()}
@@ -861,6 +862,7 @@ const CreateLine = () => {
 
                       {isSelected && (
                         <button
+                          data-delete-node={node.id}
                           onClick={(e) => {
                             e.stopPropagation();
                             deleteNode(node.id);
