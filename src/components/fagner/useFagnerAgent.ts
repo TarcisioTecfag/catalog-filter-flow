@@ -302,7 +302,8 @@ export function useFagnerAgent(deps: AgentDeps) {
       if (running) return;
       setRunning(true);
       cancelRef.current = false;
-      setCursorBoth({ visible: true });
+      // Clear any leftover "waiting" UI from a previous run before starting.
+      setCursorBoth({ visible: true, mode: "moving", speech: null });
       try {
         for (const action of actions) {
           if (cancelRef.current) break;
