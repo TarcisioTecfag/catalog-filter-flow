@@ -298,7 +298,7 @@ export function useFagnerAgent(deps: AgentDeps) {
 
   /** Run a queue of actions sequentially with humanized pacing. */
   const run = useCallback(
-    async (actions: FagnerAction[]) => {
+    async (actions: FagnerAction[], opts?: { keepCursorVisible?: boolean }) => {
       if (running) return;
       setRunning(true);
       cancelRef.current = false;
