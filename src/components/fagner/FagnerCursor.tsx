@@ -57,92 +57,144 @@ const FagnerCursor = ({ cursor, machineMap }: FagnerCursorProps) => {
             scale: { duration: 0.25 },
           }}
         >
-          {/* Click ripple at cursor tip during interactive modes */}
-          <AnimatePresence>
-            {(cursor.mode === "carrying" ||
-              cursor.mode === "drawing" ||
-              cursor.mode === "clicking") && (
+          {cursor.mode === "waiting" ? (
+            // ===== Idle/waiting: morph into a Fagner avatar with a persistent question =====
+            <motion.div
+              key="fagner-avatar"
+              initial={{ opacity: 0, scale: 0.6, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 320, damping: 20 }}
+              className="relative"
+            >
+              {/* Soft pulsing aura */}
               <motion.span
-                key={`ripple-${cursor.mode}`}
-                initial={{ opacity: 0.6, scale: 0.5 }}
-                animate={{ opacity: 0, scale: 2.6 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.7, repeat: Infinity, ease: "easeOut" }}
-                className={cn(
-                  "absolute -top-1 -left-1 h-5 w-5 rounded-full pointer-events-none",
-                  cursor.mode === "clicking" ? "bg-destructive/40" : "bg-primary/40",
-                )}
+                className="absolute -inset-2 rounded-full bg-primary/30 blur-md"
+                animate={{ scale: [1, 1.25, 1], opacity: [0.4, 0.7, 0.4] }}
+                transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
               />
-            )}
-          </AnimatePresence>
-
-          {/* Cursor arrow */}
-          <motion.div
-            animate={{
-              scale: cursor.mode === "carrying" || cursor.mode === "drawing" ? 0.85 : 1,
-              rotate: cursor.mode === "carrying" ? -18 : -12,
-            }}
-            transition={{ duration: 0.18 }}
-          >
-            <MousePointer2
-              className={cn(
-                "h-7 w-7 drop-shadow-[0_3px_6px_rgba(0,0,0,0.7)]",
-                cursor.mode === "clicking" ? "fill-destructive" : "fill-primary",
-                "stroke-background",
+              {/* Avatar bubble */}
+              <div className="relative h-12 w-12 rounded-full bg-gradient-to-br from-primary to-primary/70 border-2 border-background shadow-[0_8px_24px_-4px_rgba(0,0,0,0.6)] flex items-center justify-center">
+                <span className="text-primary-foreground font-extrabold text-base tracking-tight">F</span>
+                {/* Online dot */}
+                <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-background" />
+              </div>
+              {/* Name chip */}
+              <motion.div
+                className="absolute left-14 top-1 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-md shadow-lg whitespace-nowrap flex items-center gap-1"
+                initial={{ opacity: 0, x: -4 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.15 }}
+              >
+                <Sparkles className="h-3 w-3" /> Fagner
+              </motion.div>
+              {/* Persistent question bubble */}
+              {cursor.speech && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ delay: 0.25, type: "spring", stiffness: 320, damping: 22 }}
+                  className="absolute left-14 top-7 bg-card border border-primary/50 rounded-lg px-3 py-1.5 shadow-xl whitespace-nowrap"
+                >
+                  <span className="text-[11px] font-medium text-foreground">{cursor.speech}</span>
+                  <motion.span
+                    className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-primary align-middle"
+                    animate={{ opacity: [0.3, 1, 0.3] }}
+                    transition={{ duration: 1.4, repeat: Infinity }}
+                  />
+                  <span className="absolute -top-1 left-3 h-2 w-2 bg-card border-l border-t border-primary/50 rotate-45" />
+                </motion.div>
               )}
-              strokeWidth={1.5}
-            />
-          </motion.div>
+            </motion.div>
+          ) : (
+            <>
+              {/* Click ripple at cursor tip during interactive modes */}
+              <AnimatePresence>
+                {(cursor.mode === "carrying" ||
+                  cursor.mode === "drawing" ||
+                  cursor.mode === "clicking") && (
+                  <motion.span
+                    key={`ripple-${cursor.mode}`}
+                    initial={{ opacity: 0.6, scale: 0.5 }}
+                    animate={{ opacity: 0, scale: 2.6 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.7, repeat: Infinity, ease: "easeOut" }}
+                    className={cn(
+                      "absolute -top-1 -left-1 h-5 w-5 rounded-full pointer-events-none",
+                      cursor.mode === "clicking" ? "bg-destructive/40" : "bg-primary/40",
+                    )}
+                  />
+                )}
+              </AnimatePresence>
 
-          {/* Name + mode chip */}
-          <motion.span
-            className="absolute left-6 top-5 text-[10px] font-bold bg-primary text-primary-foreground px-2 py-0.5 rounded-md shadow-lg whitespace-nowrap flex items-center gap-1"
-            animate={{ y: [0, -1, 0] }}
-            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-          >
-            {modeIcon(cursor.mode)}
-            Fagner
-          </motion.span>
-
-          {/* Speech bubble */}
-          <AnimatePresence mode="wait">
-            {cursor.speech && (
+              {/* Cursor arrow */}
               <motion.div
-                key={cursor.speech}
-                initial={{ opacity: 0, y: 6, scale: 0.85 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -4, scale: 0.9 }}
-                transition={{ duration: 0.22, ease: "easeOut" }}
-                className="absolute left-8 top-12 bg-card border border-primary/40 rounded-lg px-2.5 py-1 shadow-xl whitespace-nowrap max-w-[260px]"
+                animate={{
+                  scale: cursor.mode === "carrying" || cursor.mode === "drawing" ? 0.85 : 1,
+                  rotate: cursor.mode === "carrying" ? -18 : -12,
+                }}
+                transition={{ duration: 0.18 }}
               >
-                <span className="text-[10px] font-medium text-foreground">{cursor.speech}</span>
-                <span className="absolute -top-1 left-2 h-2 w-2 bg-card border-l border-t border-primary/40 rotate-45" />
+                <MousePointer2
+                  className={cn(
+                    "h-7 w-7 drop-shadow-[0_3px_6px_rgba(0,0,0,0.7)]",
+                    cursor.mode === "clicking" ? "fill-destructive" : "fill-primary",
+                    "stroke-background",
+                  )}
+                  strokeWidth={1.5}
+                />
               </motion.div>
-            )}
-          </AnimatePresence>
 
-          {/* Ghost card while carrying a NEW machine from catalog */}
-          <AnimatePresence>
-            {cursor.mode === "carrying" && carriedMachine && (
-              <motion.div
-                key={`ghost-${carriedMachine.id}`}
-                initial={{ opacity: 0, scale: 0.7, y: 0 }}
-                animate={{ opacity: 0.95, scale: 1, y: 18 }}
-                exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.18 } }}
-                transition={{ type: "spring", stiffness: 380, damping: 22 }}
-                className="absolute left-3 top-0"
+              {/* Name + mode chip */}
+              <motion.span
+                className="absolute left-6 top-5 text-[10px] font-bold bg-primary text-primary-foreground px-2 py-0.5 rounded-md shadow-lg whitespace-nowrap flex items-center gap-1"
+                animate={{ y: [0, -1, 0] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
               >
-                <div className="rounded-lg border-2 border-primary/80 bg-card/95 backdrop-blur shadow-[0_8px_24px_-4px_rgba(0,0,0,0.6)] px-2 py-1.5 flex items-center gap-2 rotate-[-5deg]">
-                  <div className="h-6 w-6 rounded bg-primary/20 flex items-center justify-center">
-                    <ImageIcon className="h-3 w-3 text-primary" />
-                  </div>
-                  <p className="text-[10px] font-semibold text-foreground whitespace-nowrap">
-                    {carriedMachine.name}
-                  </p>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                {modeIcon(cursor.mode)}
+                Fagner
+              </motion.span>
+
+              {/* Speech bubble */}
+              <AnimatePresence mode="wait">
+                {cursor.speech && (
+                  <motion.div
+                    key={cursor.speech}
+                    initial={{ opacity: 0, y: 6, scale: 0.85 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4, scale: 0.9 }}
+                    transition={{ duration: 0.22, ease: "easeOut" }}
+                    className="absolute left-8 top-12 bg-card border border-primary/40 rounded-lg px-2.5 py-1 shadow-xl whitespace-nowrap max-w-[260px]"
+                  >
+                    <span className="text-[10px] font-medium text-foreground">{cursor.speech}</span>
+                    <span className="absolute -top-1 left-2 h-2 w-2 bg-card border-l border-t border-primary/40 rotate-45" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Ghost card while carrying a NEW machine from catalog */}
+              <AnimatePresence>
+                {cursor.mode === "carrying" && carriedMachine && (
+                  <motion.div
+                    key={`ghost-${carriedMachine.id}`}
+                    initial={{ opacity: 0, scale: 0.7, y: 0 }}
+                    animate={{ opacity: 0.95, scale: 1, y: 18 }}
+                    exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.18 } }}
+                    transition={{ type: "spring", stiffness: 380, damping: 22 }}
+                    className="absolute left-3 top-0"
+                  >
+                    <div className="rounded-lg border-2 border-primary/80 bg-card/95 backdrop-blur shadow-[0_8px_24px_-4px_rgba(0,0,0,0.6)] px-2 py-1.5 flex items-center gap-2 rotate-[-5deg]">
+                      <div className="h-6 w-6 rounded bg-primary/20 flex items-center justify-center">
+                        <ImageIcon className="h-3 w-3 text-primary" />
+                      </div>
+                      <p className="text-[10px] font-semibold text-foreground whitespace-nowrap">
+                        {carriedMachine.name}
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </>
+          )}
         </motion.div>
       )}
     </AnimatePresence>
