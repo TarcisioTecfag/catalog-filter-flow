@@ -620,7 +620,7 @@ const CreateLine = () => {
       setDemoVisible(false);
       // Snapshot existing node ids so we can detect what was newly dropped.
       const beforeIds = new Set(nodesRef.current.map((n) => n.id));
-      await fagner.run(result.actions);
+      await fagner.run(result.actions, { keepCursorVisible: !!result.autoConnectNewDrops });
 
       // 4) For "monte uma linha", auto-connect the freshly dropped nodes in
       //    drop order. We diff node ids against the snapshot — the agent

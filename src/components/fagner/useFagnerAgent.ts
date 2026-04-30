@@ -65,7 +65,7 @@ export interface CursorState {
   visible: boolean;
   speech: string | null;
   // Visual modes for the cursor itself.
-  mode: "idle" | "moving" | "carrying" | "drawing" | "clicking";
+  mode: "idle" | "moving" | "carrying" | "drawing" | "clicking" | "waiting";
   // Optional machine snippet attached to cursor while carrying.
   carryingMachineId: string | null;
 }
@@ -79,17 +79,17 @@ const DEFAULT_CURSOR: CursorState = {
   carryingMachineId: null,
 };
 
-// Humanized timing — feel free to tweak per phase.
+// Humanized timing — tuned for a realistic 25–35s full build.
 const T = {
-  travelMin: 380,
-  travelPerPx: 0.55, // extra ms per pixel of distance, capped below
-  travelMax: 950,
-  hoverBeforeClick: 220,
-  clickFlash: 160,
-  pickupLift: 180,
-  dropSettle: 320,
-  connectLatch: 240,
-  postAction: 200,
+  travelMin: 620,
+  travelPerPx: 0.95, // extra ms per pixel of distance, capped below
+  travelMax: 1500,
+  hoverBeforeClick: 480,
+  clickFlash: 260,
+  pickupLift: 380,
+  dropSettle: 620,
+  connectLatch: 520,
+  postAction: 480,
 };
 
 /** Animate the cursor toward a target with humanized duration; returns Promise that resolves on arrival. */
@@ -298,11 +298,12 @@ export function useFagnerAgent(deps: AgentDeps) {
 
   /** Run a queue of actions sequentially with humanized pacing. */
   const run = useCallback(
-    async (actions: FagnerAction[]) => {
+    async (actions: FagnerAction[], opts?: { keepCursorVisible?: boolean }) => {
       if (running) return;
       setRunning(true);
       cancelRef.current = false;
-      setCursorBoth({ visible: true });
+      // Clear any leftover "waiting" UI from a previous run before starting.
+      setCursorBoth({ visible: true, mode: "moving", speech: null });
       try {
         for (const action of actions) {
           if (cancelRef.current) break;
@@ -339,9 +340,21 @@ export function useFagnerAgent(deps: AgentDeps) {
         }
       } finally {
         setRunning(false);
-        // Linger briefly, then hide the cursor.
-        await sleep(500);
-        setCursorBoth({ visible: false, mode: "idle", carryingMachineId: null, speech: null });
+        // Move toward a friendly resting spot, then morph into the Fagner
+        // avatar and ask if there's anything else. Stays on screen waiting
+        // for the next user message instead of disappearing.
+        await sleep(400);
+        const canvasRect = canvasRef.current?.getBoundingClientRect();
+        const restX = canvasRect ? canvasRect.width - 220 : cursorRef.current.x;
+        const restY = canvasRect ? canvasRect.height - 140 : cursorRef.current.y;
+        setCursorBoth({
+          x: restX,
+          y: restY,
+          visible: true,
+          mode: "waiting",
+          carryingMachineId: null,
+          speech: "Posso ajudar em mais alguma coisa?",
+        });
       }
     },
     [

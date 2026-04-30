@@ -105,7 +105,15 @@ function buildAssembleActions(
   const tempIds: string[] = [];
   list.forEach((m, i) => {
     tempIds.push(m.id);
-    actions.push({ kind: "say", text: i === 0 ? "Beleza, vou montar isso pra você." : `Agora a ${m.name.split(" ")[0]}…`, holdMs: 900 });
+    if (i > 0) {
+      // Brief human pause between machines: look at canvas, decide next step.
+      actions.push({ kind: "wait", ms: 700 });
+    }
+    actions.push({
+      kind: "say",
+      text: i === 0 ? "Beleza, vou montar isso pra você." : `Agora a ${m.name.split(" ")[0]}…`,
+      holdMs: i === 0 ? 1600 : 1200,
+    });
     actions.push({ kind: "pickFromCatalog", machineId: m.id });
     actions.push({
       kind: "dropAt",
